@@ -97,11 +97,11 @@ export function createChatStore(platform?: ChatPlatform) {
       }
       return loadPromise;
     },
-    async create(mode: ChatMode): Promise<string | null> {
+    async create(mode: ChatMode, initialDraft = ""): Promise<string | null> {
       const id = crypto.randomUUID();
       const ok = await mutate(archive => {
         if (archive.conversations.length >= 50) throw new Error("You have 50 conversations. Export and delete an older chat before starting another.");
-        archive.conversations.push({ id, mode, title: mode === "finance" ? "New financial conversation" : "New general conversation", draft: "", updatedAt: Date.now(), messages: [] });
+        archive.conversations.push({ id, mode, title: initialDraft.trim() ? initialDraft.trim().replace(/\s+/g, " ").slice(0, 80) : mode === "finance" ? "New financial conversation" : "New general conversation", draft: initialDraft, updatedAt: Date.now(), messages: [] });
       });
       return ok ? id : null;
     },

@@ -186,6 +186,25 @@ test("unsupported forecasts stay in finance, with no invented forecast", async (
   assert.match(result.error, /summarize recorded spending/);
 });
 
+test("invalid planner output can route unrelated questions, but never bypass financial plan validation", async () => {
+  for (const scope of ["general", "finance"]) {
+    let calls = 0;
+    const handlers = createAIHandlers({ environment: {}, fetch: async (_url, options) => {
+      if (++calls === 2) {
+        const body = JSON.parse(String(options?.body));
+        assert.equal(body.messages[1].content, "Why is the sky blue?");
+        assert.doesNotMatch(String(options?.body), /secret merchant|secret purchase/);
+      }
+      return Response.json({ done: true, message: { content: JSON.stringify(calls === 1 ? { ...queryPlan, intent: "unsupported", compareFrom: "2025-01-01", compareTo: "2025-10-31" } : { scope }) } });
+    } });
+    const response = await handlers.query(post({ question: "Why is the sky blue?", month: "2026-10", expenses: [{ id: "one", date: "2026-10-01", amount: 10, category: "Food", merchant: "secret merchant", description: "secret purchase", createdAt: 1 }], suggestScope: true }, "query"));
+    const result = await response.json();
+    assert.equal(result.answer, undefined);
+    if (scope === "general") { assert.equal(response.status, 422); assert.equal(result.suggestedMode, "general"); }
+    else { assert.equal(response.status, 502); assert.equal(result.code, "INVALID_AI_PLAN"); }
+  }
+});
+
 function platform() {
   let raw: string | null = null;
   let writeError = "";
@@ -216,6 +235,20 @@ test("failed saves do not publish drafts or discard existing chat history", asyn
   assert.equal(disk.raw(), before); assert.equal(store.getSnapshot().archive.conversations[0].draft, "");
   assert.equal(store.getSnapshot().error, "Quota exceeded");
   disk.fail(""); assert.equal(await store.update(id, chat => { chat.draft = "Recovered"; }), true);
+});
+
+test("a general handoff draft is created atomically without replacing the previous chat or draft", async () => {
+  const disk = platform(), store = createChatStore(disk.io); await store.load();
+  const existing = (await store.create("general", "Keep this unfinished message"))!;
+  const handoff = (await store.create("general", "Why is the sky blue?"))!;
+  const reloaded = createChatStore(disk.io); await reloaded.load();
+  const chats = reloaded.getSnapshot().archive.conversations;
+  assert.equal(chats.find(chat => chat.id === existing)?.draft, "Keep this unfinished message");
+  assert.equal(chats.find(chat => chat.id === handoff)?.draft, "Why is the sky blue?");
+  assert.equal(chats.find(chat => chat.id === handoff)?.mode, "general");
+  disk.fail("Storage full");
+  const before = disk.raw(); assert.equal(await store.create("general", "Do not lose this"), null);
+  assert.equal(disk.raw(), before); assert.equal(store.getSnapshot().archive.conversations.length, 2);
 });
 
 test("rename and confirmed deletion only affect the selected chat, not another mode", async () => {
