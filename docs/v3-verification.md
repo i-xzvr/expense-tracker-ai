@@ -29,6 +29,7 @@ All verification used synthetic records, never private receipts.
 - Full AI setup completed with portable Node 24.19.0, Ollama 0.40.0, and the exact pinned Qwen3.5 4B model. Official archive checksums and all model blobs were verified; the real structured readiness test passed.
 - Twelve installer checks passed: paths with spaces, correct/bad hashes, canonical model/provenance integrity, tampered layer rejection, loopback hidden process startup, process identity, idempotent startup/stop, refusal to use an unrelated occupied port, and refusal to stop a mismatching PID.
 - Cached runtime reinstallation was tested. Setup locking rejects concurrent setup. Process identity checks work with both Windows PowerShell 5.1 and PowerShell 7.
+- The actual CMD wrappers were exercised, including full setup, stop, and production start. SHA256 checks use streaming .NET hashing so they remain available when Windows PowerShell inherits another shell's module paths.
 - A fresh source copy in a separate folder with spaces extracted portable Node, installed the exact lockfile, passed all application checks, launched successfully in no-AI mode, and stopped its own process. The app explicitly reported AI disabled while reports/backup restoration remained usable.
 
 ## Practical limits

@@ -5,6 +5,19 @@ $script:V3Root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $script:V3Runtime = Join-Path $script:V3Root '.runtime'
 $script:V3Config = Get-Content -LiteralPath (Join-Path $script:V3Root 'config/local-ai.json') -Raw | ConvertFrom-Json
 
+# Get-FileHash is a module-exported function that may not be discoverable when
+# Windows PowerShell inherits another shell's module paths. Hash through .NET
+# directly so double-click launchers keep checksum verification self-contained.
+function Get-V3FileHash {
+    param([Parameter(Mandatory=$true)][string]$LiteralPath, [ValidateSet('SHA256')][string]$Algorithm = 'SHA256')
+    $stream = [IO.File]::OpenRead($LiteralPath)
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try {
+        $digest = $hasher.ComputeHash($stream)
+        return [PSCustomObject]@{ Hash = [BitConverter]::ToString($digest).Replace('-', '') }
+    } finally { $hasher.Dispose(); $stream.Dispose() }
+}
+
 function Initialize-V3Folders {
     foreach ($directory in @('downloads', 'logs', 'state', 'models', 'ollama-profile', 'tmp')) {
         New-Item -ItemType Directory -Force -Path (Join-Path $script:V3Runtime $directory) | Out-Null
@@ -22,7 +35,7 @@ function Assert-V3Windows {
 
 function Assert-V3Hash([string]$Path, [string]$Expected) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Required file is missing: $Path" }
-    $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    $actual = (Get-V3FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actual -ne $Expected.ToLowerInvariant()) { throw "SHA256 mismatch: $Path. Expected $Expected; got $actual. The file was not trusted or executed." }
 }
 
@@ -178,7 +191,7 @@ function Assert-V3ModelFiles([string]$Name, [switch]$Full) {
     $manifest = Join-Path (Join-Path $script:V3Runtime 'models/manifests') $model.manifest
     if (-not (Test-Path -LiteralPath $manifest)) { throw "Model $Name is missing. Run Setup-V3.cmd." }
     $contents = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
-    $storedHash = (Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
+    $storedHash = (Get-V3FileHash -LiteralPath $manifest -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($storedHash -ne $model.sha256) {
         # Ollama 0.40 stores provenance layers in the local manifest. Its public model
         # digest is the original canonical manifest, retained as a verified blob.

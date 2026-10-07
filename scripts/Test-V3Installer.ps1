@@ -15,7 +15,7 @@ function Assert-Installer($Condition, [string]$Message) {
 try {
     $fixture = Join-Path $testRuntime 'test helper.js'
     'require("node:http").createServer((req,res)=>{res.setHeader("Content-Type","application/json");res.end("{\"ok\":true}")}).listen(Number(process.argv[2]),"127.0.0.1");' | Set-Content -LiteralPath $fixture -Encoding ASCII
-    $hash = (Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash
+    $hash = (Get-V3FileHash -LiteralPath $fixture -Algorithm SHA256).Hash
     Assert-V3Hash $fixture $hash
     Assert-Installer $true 'Correct hash accepted, including paths with spaces.'
     $rejected = $false
@@ -26,7 +26,7 @@ try {
     New-Item -ItemType Directory -Force -Path $modelDirectory, $blobDirectory | Out-Null
     $blobFixture = Join-Path $testRuntime 'config fixture.json'
     [IO.File]::WriteAllText($blobFixture, '{}')
-    $blobHash = (Get-FileHash -LiteralPath $blobFixture -Algorithm SHA256).Hash.ToLowerInvariant()
+    $blobHash = (Get-V3FileHash -LiteralPath $blobFixture -Algorithm SHA256).Hash.ToLowerInvariant()
     Copy-Item -LiteralPath $blobFixture -Destination (Join-Path $blobDirectory "sha256-$blobHash")
     $canonical = [ordered]@{
         schemaVersion = 2; mediaType = 'application/vnd.docker.distribution.manifest.v2+json'
@@ -36,7 +36,7 @@ try {
     }
     $manifestPath = Join-Path $modelDirectory 'tiny'
     [IO.File]::WriteAllText($manifestPath, ($canonical | ConvertTo-Json -Depth 12 -Compress))
-    $manifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $manifestHash = (Get-V3FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
     $script:V3Config.models = @([PSCustomObject]@{ name = 'fixture:tiny'; manifest = 'test/library/fixture/tiny'; sha256 = $manifestHash })
     Assert-V3ModelFiles 'fixture:tiny' -Full
     Assert-Installer $true 'Original model manifest and blob are verified.'
