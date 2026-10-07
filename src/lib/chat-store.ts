@@ -1,6 +1,7 @@
 import type { QueryResponse } from "./ai/types";
 import type { ChatTurn } from "./ai/conversation";
 import { isObject } from "./ai/validation";
+import { serverChatPlatform } from "./chat-platform";
 
 export type ChatMode = "finance" | "general";
 export interface SavedMessage {
@@ -13,8 +14,8 @@ export interface Conversation {
   id: string; mode: ChatMode; title: string; draft: string; updatedAt: number; messages: SavedMessage[];
 }
 export interface ChatArchive { schema: 1; conversations: Conversation[] }
-export interface ChatSnapshot { archive: ChatArchive; loaded: boolean; error: string | null }
-export interface ChatPlatform { read(): Promise<string | null>; write(raw: string, expected: string | null): Promise<void>; subscribe(listener: () => void): () => void }
+export interface ChatSnapshot { archive: ChatArchive; loaded: boolean; error: string | null; warning?: string | null }
+export interface ChatPlatform { read(): Promise<string | null>; write(raw: string, expected: string | null): Promise<void>; remove?(id: string, expectedUpdatedAt: number): Promise<void>; warning?(): string | null; subscribe(listener: () => void): () => void }
 export const CHAT_MAX_BYTES = 24 * 1024 * 1024;
 const EMPTY: ChatSnapshot = { archive: { schema: 1, conversations: [] }, loaded: false, error: null };
 const errorText = (error: unknown) => error instanceof Error ? error.message : "Chat history could not be saved.";
@@ -66,9 +67,9 @@ export function createChatStore(platform?: ChatPlatform) {
   async function refresh() {
     if (!platform) return;
     const next = await platform.read();
-    if (!snapshot.loaded || next !== raw) {
+    if (!snapshot.loaded || next !== raw || snapshot.error || (snapshot.warning ?? null) !== (platform.warning?.() ?? null)) {
       const archive = next === null ? { schema: 1 as const, conversations: [] } : parseChatArchive(next);
-      raw = next; snapshot = { archive, loaded: true, error: null }; emit();
+      raw = next; snapshot = { archive, loaded: true, error: null, warning: platform.warning?.() ?? null }; emit();
     }
   }
   async function mutate(change: (archive: ChatArchive) => void): Promise<boolean> {
@@ -81,7 +82,7 @@ export function createChatStore(platform?: ChatPlatform) {
       if (new TextEncoder().encode(next).length > CHAT_MAX_BYTES) throw new Error("Chat history is full. Export and delete older conversations before continuing.");
       parseChatArchive(next);
       await platform.write(next, expected);
-      raw = next; snapshot = { archive, loaded: true, error: null }; emit();
+      raw = next; snapshot = { archive, loaded: true, error: null, warning: platform.warning?.() ?? null }; emit();
       return true;
     }).catch(error => { fail(error); return false; });
     queue = task;
@@ -97,6 +98,7 @@ export function createChatStore(platform?: ChatPlatform) {
       }
       return loadPromise;
     },
+    async reload() { queue = queue.then(refresh).catch(fail); await queue; },
     async create(mode: ChatMode, initialDraft = ""): Promise<string | null> {
       const id = crypto.randomUUID();
       const ok = await mutate(archive => {
@@ -112,51 +114,20 @@ export function createChatStore(platform?: ChatPlatform) {
         change(chat); chat.updatedAt = Date.now();
       });
     },
-    remove(id: string) { return mutate(archive => { archive.conversations = archive.conversations.filter(chat => chat.id !== id); }); },
-  };
-}
-
-function browserPlatform(): ChatPlatform | undefined {
-  if (typeof window === "undefined") return undefined;
-  let database: Promise<IDBDatabase> | undefined;
-  const open = () => database ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open("expense-tracker-v3-chats", 1);
-    request.onupgradeneeded = () => request.result.createObjectStore("history");
-    request.onsuccess = () => { request.result.onversionchange = () => request.result.close(); resolve(request.result); };
-    request.onerror = () => reject(new Error("Chat storage is unavailable. Check browser storage permissions."));
-    request.onblocked = () => reject(new Error("Close other V3 tabs to open chat storage."));
-  });
-  const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("expense-tracker-v3-chats") : null;
-  return {
-    async read() {
-      const db = await open();
-      return new Promise((resolve, reject) => {
-        const request = db.transaction("history", "readonly").objectStore("history").get("archive");
-        request.onsuccess = () => resolve(request.result ?? null);
-        request.onerror = () => reject(new Error("Chat history could not be read."));
-      });
-    },
-    async write(next, expected) {
-      const db = await open();
-      return new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction("history", "readwrite");
-        const store = transaction.objectStore("history");
-        const request = store.get("archive");
-        let conflict = false;
-        request.onsuccess = () => {
-          if ((request.result ?? null) !== expected) { conflict = true; transaction.abort(); }
-          else store.put(next, "archive");
-        };
-        transaction.oncomplete = () => { channel?.postMessage("changed"); resolve(); };
-        transaction.onabort = transaction.onerror = () => reject(new Error(conflict ? "Chat history changed in another tab. Try again." : "Chat history could not be saved. Check available browser storage."));
-      });
-    },
-    subscribe(listener) {
-      channel?.addEventListener("message", listener);
-      window.addEventListener("focus", listener);
-      return () => { channel?.removeEventListener("message", listener); window.removeEventListener("focus", listener); };
+    remove(id: string, expectedUpdatedAt?: number) {
+      if (!platform?.remove) return mutate(archive => { archive.conversations = archive.conversations.filter(chat => chat.id !== id); });
+      const task = queue.then(async () => {
+        const current = await platform.read();
+        const archive = current === null ? { schema: 1 as const, conversations: [] } : parseChatArchive(current);
+        const chat = archive.conversations.find(item => item.id === id);
+        if (chat) await platform.remove!(id, expectedUpdatedAt ?? chat.updatedAt);
+        await refresh();
+        return true;
+      }).catch(error => { fail(error); return false; });
+      queue = task;
+      return task;
     },
   };
 }
 
-export const chatStore = createChatStore(browserPlatform());
+export const chatStore = createChatStore(typeof window === "undefined" ? undefined : serverChatPlatform());

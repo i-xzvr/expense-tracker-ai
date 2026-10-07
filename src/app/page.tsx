@@ -20,7 +20,7 @@ import ChatAssistant from "@/components/v3/ChatAssistant";
 import BackupAndHistory from "@/components/v3/BackupAndHistory";
 import { Notice, useFeedback } from "@/components/v3/shared";
 
-const tabs = ["Overview", "Reports", "Receipts", "Reconcile", "Local AI", "Backup"] as const;
+const tabs = ["Overview", "Reports", "Receipts", "Reconcile", "Local AI", "Backup", "Tools"] as const;
 type Tab = (typeof tabs)[number];
 type FormState = { mode: "add"; defaults?: Partial<AccountingExpense> } | { mode: "edit"; expense: AccountingExpense } | null;
 
@@ -78,7 +78,7 @@ export default function HomePage() {
         {tab === "Reports" && <Reports controller={controller} month={month} onEdit={edit} onReceipts={() => setTab("Receipts")} onReconcile={() => setTab("Reconcile")} />}
         {tab === "Receipts" && <ReceiptInbox controller={controller} onCreate={create} />}
         {tab === "Reconcile" && <Reconcile key={month} controller={controller} month={month} onCreate={create} onEdit={edit} />}
-        <ChatAssistant expenses={expenses} month={month} financeVisible={tab === "Local AI"} popupOpen={chatOpen} onPopupChange={setChatOpen} onShowFinance={() => setTab("Local AI")} onEdit={edit} />
+        <ChatAssistant expenses={expenses} month={month} financeVisible={tab === "Local AI"} toolsVisible={tab === "Tools"} popupOpen={chatOpen} onPopupChange={setChatOpen} onShowFinance={() => setTab("Local AI")} onShowTools={() => setTab("Tools")} onEdit={edit} />
         {tab === "Backup" && <BackupAndHistory controller={controller} />}
       </>}
     </main>

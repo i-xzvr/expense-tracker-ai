@@ -7,12 +7,14 @@ import type { QueryPlan } from "@/lib/ai/query";
 import { REPORT_QUESTIONS } from "@/lib/ai/report-questions";
 import { jsonLines, recentChatContext } from "@/lib/ai/conversation";
 import { chatStore, completedChatTurns, type ChatMode, type Conversation, type SavedMessage } from "@/lib/chat-store";
+import { retainedBrowserChats } from "@/lib/chat-platform";
 import { downloadExportFile } from "@/lib/export/download";
 import Modal from "@/components/Modal";
 import FinancialEvidence from "./LocalAssistant";
 import { Notice, Panel } from "./shared";
 
 const nameOf = (mode: ChatMode) => mode === "finance" ? "Finance" : "General chat";
+const chatIdentifier = (chat: Conversation) => `${chat.mode === "finance" ? "FIN" : "GEN"}-${chat.id.slice(0, 8)}`;
 const stamp = (at: number) => new Date(at).toLocaleString();
 const message = (role: SavedMessage["role"], content: string, status: SavedMessage["status"] = "complete"): SavedMessage => ({ id: crypto.randomUUID(), role, content, status, at: Date.now() });
 async function readAIStatus(signal: AbortSignal): Promise<AIStatus> {
@@ -44,9 +46,9 @@ function Transcript({ chat, live, expenses, onEdit }: { chat?: Conversation; liv
   </>;
 }
 
-export default function ChatAssistant({ expenses, month, financeVisible, popupOpen, onPopupChange, onShowFinance, onEdit }: {
-  expenses: AccountingExpense[]; month: string; financeVisible: boolean; popupOpen: boolean;
-  onPopupChange: (open: boolean) => void; onShowFinance: () => void; onEdit: (expense: AccountingExpense) => void;
+export default function ChatAssistant({ expenses, month, financeVisible, toolsVisible, popupOpen, onPopupChange, onShowFinance, onShowTools, onEdit }: {
+  expenses: AccountingExpense[]; month: string; financeVisible: boolean; toolsVisible: boolean; popupOpen: boolean;
+  onPopupChange: (open: boolean) => void; onShowFinance: () => void; onShowTools: () => void; onEdit: (expense: AccountingExpense) => void;
 }) {
   const snapshot = useSyncExternalStore(chatStore.subscribe, chatStore.getSnapshot, chatStore.getServerSnapshot);
   const [selected, setSelected] = useState<Partial<Record<ChatMode, string>>>({});
@@ -71,12 +73,30 @@ export default function ChatAssistant({ expenses, month, financeVisible, popupOp
   const [search, setSearch] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [rename, setRename] = useState<{ id: string; title: string } | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [modeFilter, setModeFilter] = useState<"all" | ChatMode>("all");
+  const [context, setContext] = useState<{ id: string; x: number; y: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const ordered = [...snapshot.archive.conversations].sort((a, b) => b.updatedAt - a.updatedAt);
   const active = (mode: ChatMode) => ordered.find(chat => chat.id === selected[mode] && chat.mode === mode) ?? ordered.find(chat => chat.mode === mode);
   const finance = active("finance"), general = active("general");
   const current = popupOpen ? general : finance;
   const busy = busyId !== null;
+
+  useEffect(() => {
+    if (snapshot.loaded && busyId && !snapshot.archive.conversations.some(chat => chat.id === busyId)) abort.current?.abort();
+  }, [snapshot.loaded, snapshot.archive.conversations, busyId]);
+
+  useEffect(() => {
+    if (!context) return;
+    menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const dismiss = (event: PointerEvent) => { if (!(event.target instanceof Element) || !event.target.closest("[data-chat-menu], [data-chat-menu-trigger]")) setContext(null); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setContext(null); document.querySelector<HTMLButtonElement>(`[data-chat-action-id="${CSS.escape(context.id)}"]`)?.focus(); } };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", escape, true);
+    return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", escape, true); };
+  }, [context]);
 
   const checkStatus = useCallback(async () => {
     setChecking(true);
@@ -135,7 +155,7 @@ export default function ChatAssistant({ expenses, month, financeVisible, popupOp
     switching.current = true;
     try {
       if (!await flushDrafts()) return;
-      popupVisible.current = false; onPopupChange(false);
+      setContext(null); popupVisible.current = false; onPopupChange(false);
       if (showFinance) onShowFinance();
     } finally { switching.current = false; }
   }
@@ -158,7 +178,7 @@ export default function ChatAssistant({ expenses, month, financeVisible, popupOp
     switching.current = true;
     try {
       if (!await flushDrafts()) return;
-      setSelected(old => ({ ...old, [chat.mode]: chat.id })); setDeleteId(null); setRename(null);
+      setSelected(old => ({ ...old, [chat.mode]: chat.id })); setContext(null); setRename(null);
       if (chat.mode === "finance") { popupVisible.current = false; onPopupChange(false); onShowFinance(); }
       else showGeneralPopup();
     } finally { switching.current = false; }
@@ -176,8 +196,58 @@ export default function ChatAssistant({ expenses, month, financeVisible, popupOp
   }
   async function persistReply(id: string, reply: SavedMessage) {
     const saved = await chatStore.update(id, chat => { if (!chat.messages.some(item => item.id === reply.id)) chat.messages.push(reply); });
-    if (!saved) setUnsaved({ id, message: reply });
-    else setUnsaved(null);
+    if (!saved) {
+      await chatStore.reload();
+      if (!chatStore.getSnapshot().archive.conversations.some(chat => chat.id === id)) {
+        setUnsaved(null); setError("This chat was deleted in another window. Its reply was not saved. Open or start another chat to continue.");
+      } else setUnsaved({ id, message: reply });
+    } else setUnsaved(null);
+  }
+  async function openTools() {
+    if (switching.current) return;
+    switching.current = true;
+    try {
+      if (!await flushDrafts()) return;
+      setContext(null); popupVisible.current = false; onPopupChange(false); onShowTools();
+    } finally { switching.current = false; }
+  }
+  async function requestDelete(chat: Conversation) {
+    if (busyId === chat.id || unsaved?.id === chat.id || deleting) return;
+    setContext(null); setRename(null);
+    if (!await flushDrafts()) return;
+    const latest = chatStore.getSnapshot().archive.conversations.find(item => item.id === chat.id);
+    if (latest) setDeleteTarget(latest);
+  }
+  async function confirmDelete() {
+    if (!deleteTarget || deleting || busyId === deleteTarget.id || unsaved?.id === deleteTarget.id) return;
+    setDeleting(true);
+    try {
+      const id = deleteTarget.id;
+      if (!await chatStore.remove(id, deleteTarget.updatedAt)) return;
+      clearTimeout(draftTimers.current.get(id)); draftTimers.current.delete(id); pendingDrafts.current.delete(id);
+      setDrafts(old => { const next = { ...old }; delete next[id]; return next; });
+      setSelected(old => { const next = { ...old }; if (next[deleteTarget.mode] === id) delete next[deleteTarget.mode]; return next; });
+      setDeleteTarget(null); setError("");
+    } finally { setDeleting(false); }
+  }
+  function openMenu(chat: Conversation, x: number, y: number) {
+    setContext({ id: chat.id, x: Math.max(8, Math.min(x, window.innerWidth - 224)), y: Math.max(8, Math.min(y, window.innerHeight - 150)) });
+  }
+  function contextMenu() {
+    const chat = ordered.find(item => item.id === context?.id);
+    if (!context || !chat) return null;
+    return <div ref={menuRef} data-chat-menu role="menu" tabIndex={-1} aria-label={`Actions for ${chatIdentifier(chat)}`} className="fixed z-50 w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-xl" style={{ left: context.x, top: context.y }} onKeyDown={event => {
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
+      const index = items.indexOf(document.activeElement as HTMLButtonElement);
+      const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+      items[next]?.focus();
+    }}>
+      <button type="button" role="menuitem" className="block w-full rounded p-2 text-left text-sm hover:bg-slate-50" onClick={() => void openSaved(chat)}>Open chat</button>
+      <button type="button" role="menuitem" className="block w-full rounded p-2 text-left text-sm hover:bg-slate-50" onClick={() => { setRename({ id: chat.id, title: chat.title }); setContext(null); }}>Rename chat</button>
+      <button type="button" role="menuitem" className="block w-full rounded p-2 text-left text-sm text-red-700 hover:bg-red-50" disabled={busyId === chat.id || unsaved?.id === chat.id} onClick={() => void requestDelete(chat)}>Delete chat</button>
+    </div>;
   }
 
   async function ask(mode: ChatMode, chat: Conversation) {
@@ -252,38 +322,74 @@ export default function ChatAssistant({ expenses, month, financeVisible, popupOp
   function alerts() {
     return <>
       {snapshot.error && <Notice error>{snapshot.error}</Notice>}
+      {snapshot.warning && <Notice error>{snapshot.warning}</Notice>}
+      {snapshot.warning && <button className="btn-secondary mt-2" onClick={() => void exportRetainedHistory()}>Export retained browser chats</button>}
       {error && <Notice error>{error}</Notice>}
       {unsaved && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm"><p>This reply is visible but could not be saved. Keep this page open and retry saving.</p><p className="mt-2 whitespace-pre-wrap break-words">{unsaved.message.content}</p><button className="btn-secondary mt-2" onClick={() => void persistReply(unsaved.id, unsaved.message)}>Retry saving reply</button></div>}
       {status && !status.modelReady && <Notice>Run Setup-V3.cmd and Start-V3.cmd with AI enabled. {status.error} Reports and manual entry remain available.</Notice>}
     </>;
   }
-  const history = ordered.filter(chat => `${chat.title} ${chat.messages.map(item => item.content).join(" ")}`.toLowerCase().includes(search.toLowerCase()));
+  const history = ordered.filter(chat => `${chat.title} ${chatIdentifier(chat)} ${chat.id} ${nameOf(chat.mode)} ${chat.messages.map(item => item.content).join(" ")}`.toLowerCase().includes(search.toLowerCase()));
+  function chatRow(chat: Conversation, inTools = false) {
+    return <div key={chat.id} className={`rounded-lg border p-3 ${!inTools && current?.id === chat.id ? "border-indigo-400 bg-white" : "border-slate-200 bg-white"}`}>
+      <div className="flex items-start gap-2">
+        <button className="min-w-0 flex-1 text-left" aria-label={`Open ${chat.title} (${chatIdentifier(chat)})`} aria-haspopup="menu" onClick={() => void openSaved(chat)} onContextMenu={event => { event.preventDefault(); openMenu(chat, event.clientX, event.clientY); }} onKeyDown={event => {
+          if (event.key === "ContextMenu" || event.shiftKey && event.key === "F10") { event.preventDefault(); const bounds = event.currentTarget.getBoundingClientRect(); openMenu(chat, bounds.left, bounds.bottom); }
+        }}>
+          <p className="break-words text-sm font-medium">{chat.title}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span className={`rounded px-2 py-0.5 font-semibold ${chat.mode === "finance" ? "bg-emerald-50 text-emerald-800" : "bg-indigo-50 text-indigo-800"}`}>{chat.mode === "finance" ? "Finance" : "General"}</span><code title={chat.id} className="text-slate-500">{chatIdentifier(chat)}</code></div>
+          <p className="mt-1 text-xs text-slate-500">{new Date(chat.updatedAt).toLocaleDateString()}{inTools ? ` · ${chat.messages.length} messages${chat.draft ? " · Saved draft" : ""}` : ""}</p>
+        </button>
+        <button type="button" data-chat-menu-trigger data-chat-action-id={chat.id} className="rounded px-2 py-1 text-slate-600 hover:bg-slate-100" aria-label={`Actions for ${chat.title} (${chatIdentifier(chat)})`} aria-haspopup="menu" aria-expanded={context?.id === chat.id} onClick={event => { if (context?.id === chat.id) setContext(null); else { const bounds = event.currentTarget.getBoundingClientRect(); openMenu(chat, bounds.right - 208, bounds.bottom); } }}>•••</button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-3 text-xs"><button className="text-indigo-700 underline" aria-label={`Rename ${chat.title} (${chatIdentifier(chat)})`} onClick={() => { setRename({ id: chat.id, title: chat.title }); setContext(null); }}>Rename</button><button className="text-red-700 underline" aria-label={`Delete ${chat.title} (${chatIdentifier(chat)})`} disabled={busyId === chat.id || unsaved?.id === chat.id} onClick={() => void requestDelete(chat)}>Delete</button></div>
+      {inTools && <details className="mt-2 text-xs text-slate-500"><summary className="cursor-pointer">Full chat identifier</summary><code className="mt-1 block break-all">{chat.id}</code></details>}
+      {rename?.id === chat.id && <form className="mt-2 space-y-2" onSubmit={async event => { event.preventDefault(); if (rename.title.trim() && await chatStore.update(chat.id, item => { item.title = rename.title.trim(); })) setRename(null); }}><input className="input" aria-label="Conversation title" maxLength={100} value={rename.title} onChange={event => setRename({ id: chat.id, title: event.target.value })} /><div className="flex gap-2"><button className="text-indigo-700 underline">Save title</button><button type="button" onClick={() => setRename(null)}>Cancel</button></div></form>}
+    </div>;
+  }
+  function exportHistory() {
+    try { downloadExportFile({ content: JSON.stringify(snapshot.archive, null, 2), mimeType: "application/json", filename: "v3-chat-history.json" }); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Chat history could not be exported."); }
+  }
+  async function exportRetainedHistory() {
+    try {
+      const raw = await retainedBrowserChats();
+      if (raw) downloadExportFile({ content: raw, mimeType: "application/json", filename: "v3-retained-browser-chats.json" });
+      else setError("No retained browser history is available in this profile.");
+    } catch { setError("Retained browser history could not be exported. Keep this profile's data until migration is resolved."); }
+  }
   function sidebar() {
     return <aside aria-label="Saved conversations" className="flex min-h-0 flex-col gap-3 rounded-xl bg-slate-50 p-3">
       <div className="flex gap-2"><button className="btn-secondary text-xs" disabled={!snapshot.loaded || creating} onClick={() => void newChat("general")}>New chat</button><button className="btn-secondary text-xs" onClick={() => void closePopup(true)}>Go to Finance</button></div>
+      <button className="text-left text-xs text-indigo-700 underline" onClick={() => void openTools()}>Tools · Manage chats</button>
       <label className="text-xs font-medium text-slate-600">Search conversations<input type="search" className="input mt-1" value={search} onChange={event => setSearch(event.target.value)} /></label>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-        {history.map(chat => <div key={chat.id} className={`rounded-lg border p-2 ${current?.id === chat.id ? "border-indigo-400 bg-white" : "border-slate-200"}`}>
-          <button className="w-full text-left" onClick={() => void openSaved(chat)}><p className="break-words text-sm font-medium">{chat.title}</p><p className="mt-1 text-xs text-slate-500">{nameOf(chat.mode)} · {new Date(chat.updatedAt).toLocaleDateString()}</p></button>
-          <div className="mt-2 flex gap-3 text-xs"><button className="text-indigo-700 underline" aria-label={`Rename ${chat.title}`} onClick={() => { setRename({ id: chat.id, title: chat.title }); setDeleteId(null); }}>Rename</button><button className="text-red-700 underline" aria-label={`Delete ${chat.title}`} disabled={busyId === chat.id || unsaved?.id === chat.id} onClick={() => { setDeleteId(chat.id); setRename(null); }}>Delete</button></div>
-          {rename?.id === chat.id && <form className="mt-2 space-y-2" onSubmit={async event => { event.preventDefault(); if (rename.title.trim() && await chatStore.update(chat.id, item => { item.title = rename.title.trim(); })) setRename(null); }}><input className="input" aria-label="Conversation title" maxLength={100} value={rename.title} onChange={event => setRename({ id: chat.id, title: event.target.value })} /><div className="flex gap-2"><button className="text-indigo-700 underline">Save title</button><button type="button" onClick={() => setRename(null)}>Cancel</button></div></form>}
-          {deleteId === chat.id && <div className="mt-2 text-xs"><p>Delete this saved conversation?</p><div className="mt-2 flex gap-2"><button className="text-red-700 underline" onClick={async () => { clearTimeout(draftTimers.current.get(chat.id)); draftTimers.current.delete(chat.id); if (await chatStore.remove(chat.id)) { pendingDrafts.current.delete(chat.id); setDeleteId(null); } }}>Delete conversation</button><button onClick={() => setDeleteId(null)}>Keep</button></div></div>}
-        </div>)}
+        {history.map(chat => chatRow(chat))}
         {!history.length && <p className="text-xs text-slate-500">No saved conversations match.</p>}
       </div>
-      <button className="text-left text-xs text-indigo-700 underline" disabled={!snapshot.loaded} onClick={() => {
-        try { downloadExportFile({ content: JSON.stringify(snapshot.archive, null, 2), mimeType: "application/json", filename: "v3-chat-history.json" }); }
-        catch (reason) { setError(reason instanceof Error ? reason.message : "Chat history could not be exported."); }
-      }}>Export chat history</button>
-      <p className="text-xs text-slate-500">Saved in this browser, separately from your financial backup. Reopen a chat to continue it. Only recent completed turns fit the model context.</p>
+      <button className="text-left text-xs text-indigo-700 underline" disabled={!snapshot.loaded} onClick={exportHistory}>Export chat history</button>
+      <p className="text-xs text-slate-500">Saved in local SQLite, separately from your financial backup. Right-click a chat or use its Actions button. Only recent completed turns fit the model context.</p>
     </aside>;
   }
 
   return <>
+    {toolsVisible && !popupOpen && <Panel title="Tools · Chat history" description="Manage your saved General and Finance conversations.">
+      <p className="mb-4 text-sm text-slate-600">Chats, drafts and financial answer snapshots are saved in <code>data/chats.sqlite</code> inside your V3 folder. All browser profiles using this V3 copy share that history. Expense records still use the financial workspace backup.</p>
+      {snapshot.error && <Notice error>{snapshot.error}</Notice>}
+      {snapshot.warning && <Notice error>{snapshot.warning}</Notice>}
+      {snapshot.warning && <button className="btn-secondary mt-2" onClick={() => void exportRetainedHistory()}>Export retained browser chats</button>}
+      {error && <Notice error>{error}</Notice>}
+      <div className="my-4 flex flex-wrap items-end gap-3"><label className="min-w-0 flex-1 text-sm">Search chats<input className="input mt-1" type="search" value={search} onChange={event => setSearch(event.target.value)} /></label><label className="text-sm">Chat type<select className="input mt-1" value={modeFilter} onChange={event => setModeFilter(event.target.value as typeof modeFilter)}><option value="all">All types</option><option value="general">General</option><option value="finance">Finance</option></select></label><button className="btn-secondary" onClick={() => void chatStore.reload()}>Refresh history</button><button className="btn-secondary" disabled={!snapshot.loaded} onClick={exportHistory}>Export chat history</button></div>
+      <p className="mb-3 text-xs text-slate-500">{ordered.length} saved chats · {ordered.filter(chat => chat.mode === "general").length} General · {ordered.filter(chat => chat.mode === "finance").length} Finance. Right-click a title, press Shift+F10, or use ••• for actions. Deletion always asks Yes or No.</p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{history.filter(chat => modeFilter === "all" || chat.mode === modeFilter).map(chat => chatRow(chat, true))}</div>
+      {!history.some(chat => modeFilter === "all" || chat.mode === modeFilter) && <p className="py-6 text-sm text-slate-500">No saved chats match.</p>}
+      <p className="mt-4 text-xs text-slate-500">For another machine, stop V3 before copying its data folder, or export this chat archive for safekeeping. A permanent deletion removes the chat from this database; separate backups and exported files are not changed.</p>
+      {contextMenu()}
+    </Panel>}
     {financeVisible && <Panel title="Finance assistant" description={`Verified queries from your recorded expenses · Selected report month ${month}`}>
       <div className="mb-4 flex flex-wrap justify-between gap-3"><div><p className="text-sm font-semibold">{status?.modelReady ? "Local AI ready" : "Local AI needs setup"} · Finance mode</p><p className="mt-1 text-xs text-slate-500">{status?.model || "Checking model…"} · Verified expense reports; all totals are calculated by the app.</p></div><div className="flex flex-wrap gap-2"><button className="btn-secondary" disabled={checking} onClick={() => void checkStatus()}>Check connection</button><button className="btn-secondary" disabled={creating || !snapshot.loaded} onClick={() => void newChat("finance")}>New financial chat</button><button className="btn-secondary" aria-haspopup="dialog" onClick={() => void openGeneral()}>Open general chat & history</button></div></div>
       {alerts()}
-      {finance && <label className="label mb-4">Financial conversation<select className="input mt-1" value={finance.id} onChange={event => { const chat = ordered.find(item => item.id === event.target.value); if (chat) void openSaved(chat); }}>{ordered.filter(chat => chat.mode === "finance").map(chat => <option key={chat.id} value={chat.id}>{chat.title}</option>)}</select></label>}
+      {finance && <label className="label mb-4">Financial conversation<select className="input mt-1" value={finance.id} onChange={event => { const chat = ordered.find(item => item.id === event.target.value); if (chat) void openSaved(chat); }}>{ordered.filter(chat => chat.mode === "finance").map(chat => <option key={chat.id} value={chat.id}>Finance · {chat.title} · {chatIdentifier(chat)}</option>)}</select></label>}
       <label className="label my-4 block">Common reports & questions (22)<select className="input mt-1" value="" disabled={creating || !snapshot.loaded} onChange={event => { const report = REPORT_QUESTIONS.find(item => item.id === event.target.value); if (report) { if (finance) setDraft(finance, report.question); else void newChat("finance", report.question); } }}><option value="">Choose a report or question…</option>{REPORT_QUESTIONS.map(report => <option key={report.id} value={report.id}>{report.label}</option>)}</select><span className="mt-1 block text-xs font-normal text-slate-500">Fills the question below. Edit it or press Send. “This month” uses report month {month}. Repeated payments are review candidates, not confirmed subscriptions.</span></label>
       <div className="max-h-[55vh] overflow-y-auto"><Transcript chat={finance} expenses={expenses} onEdit={onEdit} /></div>
       {suggestion && suggestion.id === finance?.id && <div className="my-3 rounded-lg bg-indigo-50 p-3 text-sm"><p>This belongs in General chat. The popup could not open yet; resolve any storage error and retry.</p><button className="btn-secondary mt-2" disabled={creating} onClick={async () => { if (await handoffToGeneral(suggestion.question)) setSuggestion(null); }}>Continue in General chat</button></div>}
@@ -300,6 +406,14 @@ export default function ChatAssistant({ expenses, month, financeVisible, popupOp
           <div className="shrink-0 border-t border-slate-200 pt-3">{composer("general", general)}</div>
         </section>
       </div>
+      {contextMenu()}
+    </Modal>}
+    {deleteTarget && <Modal title="Permanently delete this chat?" onClose={() => { if (!deleting) setDeleteTarget(null); }}>
+      <p className="text-sm text-slate-700">Delete <strong>{deleteTarget.title}</strong>?</p>
+      <p className="mt-2 text-sm"><strong>{nameOf(deleteTarget.mode)}</strong> · <code className="break-all">{deleteTarget.id}</code></p>
+      <p className="mt-3 text-sm text-red-700">This permanently removes this chat, its messages, saved draft and financial answer snapshots from V3. It cannot be undone. Your expenses and other chats are kept. Separate backups and exported files are not changed.</p>
+      {snapshot.error && <div className="mt-3"><Notice error>{snapshot.error}</Notice></div>}
+      <div className="mt-6 flex flex-wrap justify-end gap-2"><button type="button" data-initial-focus className="btn-secondary" disabled={deleting} onClick={() => setDeleteTarget(null)}>No, keep chat</button><button type="button" className="btn-danger" disabled={deleting || busyId === deleteTarget.id || unsaved?.id === deleteTarget.id} onClick={() => void confirmDelete()}>{deleting ? "Deleting…" : "Yes, delete permanently"}</button></div>
     </Modal>}
   </>;
 }

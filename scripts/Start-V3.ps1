@@ -22,6 +22,7 @@ try {
         LOCAL_AI_DISABLED = $(if ($disableAI) { '1' } else { '0' })
         NEXT_TELEMETRY_DISABLED = '1'
         NODE_ENV = 'production'
+        V3_CHAT_DATABASE_PATH = (Join-Path $script:V3Root 'data/chats.sqlite')
     }
     $next = Join-Path $script:V3Root 'node_modules/next/dist/bin/next'
     $existing = Get-V3ProcessRecord 'app'
