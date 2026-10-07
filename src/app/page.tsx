@@ -16,7 +16,7 @@ import ExportDialog from "@/components/ExportDialog";
 import Reports from "@/components/v3/Reports";
 import ReceiptInbox from "@/components/v3/ReceiptInbox";
 import Reconcile from "@/components/v3/Reconcile";
-import LocalAssistant from "@/components/v3/LocalAssistant";
+import ChatAssistant from "@/components/v3/ChatAssistant";
 import BackupAndHistory from "@/components/v3/BackupAndHistory";
 import { Notice, useFeedback } from "@/components/v3/shared";
 
@@ -34,6 +34,7 @@ export default function HomePage() {
   const [form, setForm] = useState<FormState>(null);
   const [pendingDelete, setPendingDelete] = useState<AccountingExpense | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const { feedback, setFeedback, result } = useFeedback();
   const filtered = useMemo(() => sortByDateDesc(filterExpenses(expenses, filters)), [expenses, filters]);
@@ -59,7 +60,7 @@ export default function HomePage() {
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
         <div className="flex items-center gap-3"><div aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-xl font-bold text-white">E</div><div><h1 className="text-lg font-semibold leading-tight">Expense Tracker <span className="ml-1 rounded bg-indigo-50 px-2 py-1 text-xs text-indigo-700">V3</span></h1><p className="mt-1 text-xs text-slate-500">Your records, clear reports, local intelligence.</p></div></div>
-        <div className="flex gap-2"><button type="button" className="btn-secondary" disabled={!loaded} aria-haspopup="dialog" onClick={() => setExportOpen(true)}>Export Data</button><button type="button" className="btn-primary" disabled={!loaded} onClick={() => create()}>Add expense</button></div>
+        <div className="flex flex-wrap gap-2"><button type="button" className="btn-secondary" disabled={!loaded} aria-haspopup="dialog" onClick={() => setChatOpen(true)}>AI chat</button><button type="button" className="btn-secondary" disabled={!loaded} aria-haspopup="dialog" onClick={() => setExportOpen(true)}>Export Data</button><button type="button" className="btn-primary" disabled={!loaded} onClick={() => create()}>Add expense</button></div>
       </div>
       <nav aria-label="Main navigation" className="mx-auto flex max-w-7xl flex-wrap gap-1 px-4 sm:px-6">{tabs.map(item => <button key={item} onClick={() => { setTab(item); setFeedback(null); }} aria-current={tab === item ? "page" : undefined} className={`border-b-2 px-4 py-3 text-sm font-medium ${tab === item ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-900"}`}>{item}</button>)}</nav>
     </header>
@@ -77,7 +78,7 @@ export default function HomePage() {
         {tab === "Reports" && <Reports controller={controller} month={month} onEdit={edit} onReceipts={() => setTab("Receipts")} onReconcile={() => setTab("Reconcile")} />}
         {tab === "Receipts" && <ReceiptInbox controller={controller} onCreate={create} />}
         {tab === "Reconcile" && <Reconcile key={month} controller={controller} month={month} onCreate={create} onEdit={edit} />}
-        {tab === "Local AI" && <LocalAssistant expenses={expenses} month={month} onEdit={edit} />}
+        <ChatAssistant expenses={expenses} month={month} financeVisible={tab === "Local AI"} popupOpen={chatOpen} onPopupChange={setChatOpen} onShowFinance={() => setTab("Local AI")} onEdit={edit} />
         {tab === "Backup" && <BackupAndHistory controller={controller} />}
       </>}
     </main>

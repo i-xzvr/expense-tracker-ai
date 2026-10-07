@@ -6,7 +6,7 @@ interface ModalProps {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
-  size?: "default" | "wide";
+  size?: "default" | "wide" | "chat";
 }
 
 export default function Modal({
@@ -107,7 +107,7 @@ export default function Modal({
         backdropPress.current = false;
         if (dismiss) onClose();
       }}
-      className={`fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[calc(100dvh-1rem)] w-full overflow-hidden rounded-t-2xl border-0 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-xs open:flex open:flex-col sm:inset-0 sm:m-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:rounded-2xl ${size === "wide" ? "max-w-3xl" : "max-w-lg"}`}
+      className={`fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[calc(100dvh-1rem)] w-full overflow-hidden rounded-t-2xl border-0 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-xs open:flex open:flex-col sm:inset-0 sm:m-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:rounded-2xl ${size === "chat" ? "max-w-6xl" : size === "wide" ? "max-w-3xl" : "max-w-lg"}`}
     >
       <div className="flex shrink-0 items-center justify-between gap-4 p-6 pb-5">
         <h2 id={titleId} className="text-lg font-semibold text-slate-900">
@@ -129,7 +129,7 @@ export default function Modal({
           </svg>
         </button>
       </div>
-      <div className="min-h-0 overflow-y-auto overscroll-contain px-6 pb-6">
+      <div className={`min-h-0 overscroll-contain ${size === "chat" ? "overflow-hidden px-3 pb-3 sm:px-6 sm:pb-6" : "overflow-y-auto px-6 pb-6"}`}>
         {children}
       </div>
     </dialog>

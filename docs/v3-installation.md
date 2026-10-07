@@ -62,6 +62,8 @@ Ollama cloud features are disabled with `OLLAMA_NO_CLOUD=1`. Prompts and receipt
 
 Expense data is stored in the browser, separately from the program and model files. **Copying the project folder does not copy browser data.** Use the app's V3 backup and restore controls to transfer expenses, receipt images, budgets, statements, rules, audit history, and month-close state. Keep an extra copy before restoring. Treat backup files as sensitive accounting records; they are not encrypted by this app.
 
+The Finance and General chat modes use the same installed model, so no extra AI installation is needed. Saved conversations are separate browser data and are **not included in financial workspace backups**. Use **AI chat → Export chat history** to archive them as readable JSON. This release can reopen chats in their original browser profile but does not import chat archives on another computer. General chat has no automatic ledger access or current web information. Forecasting and a verified calculator remain future work.
+
 Always open **http://127.0.0.1:3103** in the same browser profile. `localhost`, `127.0.0.1`, different ports, different browser profiles, and different computers have separate browser storage. V2 data on port 3102 does not automatically appear on V3's 3103 origin. Export a V2 JSON report, then use **Backup → Import V2 JSON export** in V3. This adds new records, skips identical existing IDs, and rejects conflicting IDs; restoring a complete V3 backup is a separate operation. Do not clear V2's browser data until the imported records have been checked.
 
 ## Troubleshooting and lifecycle

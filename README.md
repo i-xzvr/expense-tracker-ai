@@ -17,8 +17,19 @@ For another Windows x64 computer, repeat setup and restore a **full V3 workspace
 - Accountant ZIP with CSV, printable HTML for PDF, report JSON, supporting comparison/recurrence entries, receipt images and index.
 - Full backup/validated restore including evidence; V2 JSON import adds records without discarding V3 metadata.
 - Natural-language expense questions with interpreted filters and entry evidence; local receipt reading creates a review draft.
+- General AI chat popup with a conversation sidebar, local saved history, search, rename, deletion, draft preservation, streaming responses, and Stop. V3's Local AI area always uses Finance mode; the popup always uses General mode. Both use the same installed model.
 
 The local model selects queries; code calculates amounts in integer cents. AI never edits records. Receipt drafts and recurring candidates require review. The app covers expense bookkeeping rather than a complete general ledger or tax return. Backup files contain sensitive records and are not encrypted.
+
+### Conversations and memory
+
+Use **AI chat** in the header for general conversation. Use **Local AI** for verified financial questions. The popup sidebar lists both kinds of conversation; opening a financial conversation closes the popup and returns to Finance. Closing the popup and reopening it preserves the general conversation and draft. Enter sends; Shift+Enter inserts a newline.
+
+Conversations live in a separate IndexedDB database for the same browser profile and origin. **Financial workspace backups do not include chat history.** Export chat history from the sidebar as a readable JSON archive before clearing browser storage. This first version exports an archive but does not import it on another computer. Copying program/model files does not copy conversations. History can contain personal information and financial answer snapshots and is not encrypted by the app.
+
+Reopening a conversation supplies its recent completed turns, not every past chat, to the local model (up to 31 messages / 16,000 content characters). Search finds saved chats locally; it does not give the model automatic memory of other chats. Limits are 50 conversations, 200 messages per conversation, and 24 MiB total history. Long chats keep their full saved transcript within these limits, while older turns fall outside model context. Interrupted replies are marked and excluded from context; stopped questions can be sent again. Financial follow-ups supply recent question text and the previous interpreted filters, never historical totals or ledger rows, to the query planner. Each new financial answer is calculated from current records for the selected report month. Historical evidence remains a dated snapshot.
+
+Out-of-scope financial questions can suggest opening General chat with the question as a draft; they are not automatically answered there. General chat has no automatic ledger access, receipt access, tools, or web browsing. It can discuss general financial concepts, but answers and arithmetic are model-generated and require checking. **Forecasting and a verified calculator are not implemented in this release.**
 
 ## Developer verification
 
@@ -26,7 +37,7 @@ Node 24.19.x is supported. Run npm ci, then npm run check for lint, types, deter
 
 ~~~powershell
 $env:RUN_LOCAL_AI_TESTS='1'
-node --import tsx --test tests/ai-live.test.ts
+node --import tsx --test tests/ai-live.test.ts tests/chat-live.test.ts
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-V3Installer.ps1
 ~~~
 
