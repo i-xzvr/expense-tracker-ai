@@ -18,13 +18,20 @@ function isExpense(value: unknown): value is Expense {
   );
 }
 
-export function loadExpenses(): Expense[] {
-  if (typeof window === "undefined") return [];
+export function parseStoredExpenses(raw: string | null): Expense[] {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter(isExpense) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function loadExpenses(): Expense[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return parseStoredExpenses(window.localStorage.getItem(STORAGE_KEY));
   } catch {
     return [];
   }

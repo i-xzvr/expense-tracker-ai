@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef } from "react";
 
 interface ModalProps {
   title: string;
@@ -18,7 +18,6 @@ export default function Modal({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const backdropPress = useRef(false);
   const titleId = useId();
-  const [showContent, setShowContent] = useState(false);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -27,8 +26,8 @@ export default function Modal({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     dialog.showModal();
-    // Mount inputs after opening so React's autoFocus can focus visible controls.
-    setShowContent(true);
+    // Controls are focusable once the native dialog is open.
+    dialog.querySelector<HTMLElement>("[data-initial-focus]")?.focus();
 
     return () => {
       dialog.close();
@@ -87,6 +86,8 @@ export default function Modal({
   };
 
   return (
+    // Native modal dialogs handle Escape, focus trapping, and backdrop dismissal.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
@@ -106,7 +107,7 @@ export default function Modal({
         backdropPress.current = false;
         if (dismiss) onClose();
       }}
-      className={`fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[calc(100dvh-1rem)] w-full overflow-hidden rounded-t-2xl border-0 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-sm open:flex open:flex-col sm:inset-0 sm:m-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:rounded-2xl ${size === "wide" ? "max-w-3xl" : "max-w-lg"}`}
+      className={`fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[calc(100dvh-1rem)] w-full overflow-hidden rounded-t-2xl border-0 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-xs open:flex open:flex-col sm:inset-0 sm:m-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:rounded-2xl ${size === "wide" ? "max-w-3xl" : "max-w-lg"}`}
     >
       <div className="flex shrink-0 items-center justify-between gap-4 p-6 pb-5">
         <h2 id={titleId} className="text-lg font-semibold text-slate-900">
@@ -115,7 +116,7 @@ export default function Modal({
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
           aria-label="Close"
         >
           <svg
@@ -129,7 +130,7 @@ export default function Modal({
         </button>
       </div>
       <div className="min-h-0 overflow-y-auto overscroll-contain px-6 pb-6">
-        {showContent && children}
+        {children}
       </div>
     </dialog>
   );

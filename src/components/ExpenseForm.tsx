@@ -72,7 +72,7 @@ export default function ExpenseForm({ initial, onSubmit, onCancel }: ExpenseForm
               type="text"
               inputMode="decimal"
               placeholder="0.00"
-              autoFocus={!initial}
+              data-initial-focus={!initial ? "" : undefined}
               value={values.amount}
               onChange={(e) => update("amount", e.target.value)}
               className={`input pl-7 ${errors.amount ? "input-error" : ""}`}

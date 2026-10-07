@@ -12,6 +12,8 @@ export interface ExportFile {
 function csvCell(value: string): string {
   // Spreadsheet apps can interpret formulas even after leading whitespace.
   const safe =
+    // Control characters are intentionally checked to prevent CSV formula injection.
+    // eslint-disable-next-line no-control-regex
     /^[\s\u0000-\u001f]*[=+\-@]/.test(value) || /^[\t\r\n]/.test(value)
       ? `'${value}`
       : value;

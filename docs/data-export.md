@@ -19,17 +19,20 @@ provide confirmation that the user saved the file.
 
 ## Run and check
 
-From this repository on `feature-data-export-v2`:
+Use Node **24.19.0** and npm **11.17.0**. From this repository on
+`feature-data-export-v2`:
 
 ```powershell
 npm ci
-npm test
-npm run build
+npm run check
 npm start -- --hostname 127.0.0.1 --port 3102
 ```
 
-Open http://127.0.0.1:3102. The automated tests use Node's test runner with the
-development-only `tsx` loader. No new runtime package is required by V2.
+Open http://127.0.0.1:3102. `npm run check` runs lint, TypeScript checking, tests,
+the production build, and a full dependency audit, failing on findings at any
+severity. The automated tests use Node's test runner with the development-only
+`tsx` loader. See [the dependency upgrade notes](dependency-upgrade.md) for
+version constraints, compatibility changes, and verification details.
 
 For a browser check, use a fresh localhost port/profile to avoid mixing test data
 with existing browser expenses. Check an empty export, create expenses in two
@@ -64,13 +67,18 @@ Filenames use the report creation date in the browser's local timezone.
 
 ## Add V3 without rebuilding the application
 
-For the Best-of-N exercise, V2 starts from the original `main` baseline. Its first
-commit (`3087bb5`) contains the reusable export foundation and tests; its second adds the V2
-interface and this document. To preserve an independent V3 branch from `main`,
-cherry-pick the foundation commit and implement the V3 interface there. If the
-exercise's independent-start constraint is later dropped, V3 can instead branch
-directly from V2 and retain the dialog too. Neither workflow requires recreating
-expense storage, forms, filters, or charts.
+For the Best-of-N exercise, V2 started from the original `main` baseline. Commit
+`3087bb5` contains the reusable export foundation and tests, but that historical
+commit alone no longer provides the complete starting point for V3: V3 must also
+inherit the dependency upgrade and its React, storage, modal, and styling
+compatibility changes described in [the upgrade notes](dependency-upgrade.md).
+
+If the independent-start constraint is retained, create V3 from `main` and port
+both the export foundation and the complete dependency-upgrade change set,
+reviewing any V2 interface-specific hunks before adding the V3 interface. If that
+constraint is relaxed, branch directly from the security-upgraded V2 and retain
+its working dialog. Run `npm ci` and `npm run check` on the resulting branch.
+Neither approach requires recreating expense storage, forms, filters, or charts.
 
 - Add Excel or PDF serializers that consume `ExpenseReport`.
 - Add report options and preview components without changing the storage schema.
@@ -81,11 +89,17 @@ expense storage, forms, filters, or charts.
 - Keep exports usable without AI, and separate model setup/download from report
   generation. V2 does not install, call, or configure a model service.
 
-## Existing dependency audit
+## Dependency audit
 
-On October 6, 2026, both the baseline lockfile and V2 reported the same 12 npm
-audit findings: 1 critical, 9 high, and 2 moderate. No new vulnerable package was
-introduced by the V2 test loader. The findings include the existing Next.js 14
-dependency; npm suggests major framework/toolchain upgrades for several fixes.
-Those upgrades need separate compatibility work before public deployment. The
-local verification server is bound to loopback only.
+The dependency upgrade completed on October 6, 2026 resolves the previously
+reported findings, including the critical Next.js advisories. A clean `npm ci`
+and `npm run check` passed, including all 31 tests and a full npm audit reporting
+**0 vulnerabilities**. This is an audit snapshot, not a guarantee against future
+advisories or a public deployment verification. Re-run the checks before release.
+
+ESLint 9 is retained as the latest version compatible with the selected React
+and accessibility plugins, despite its upstream end-of-life status. The upgrade
+notes document that maintenance constraint and the scoped replacement for an
+unpatched development dependency. Tailwind 4 requires Safari 16.4+, Chrome 111+,
+or Firefox 128+. The localhost command above binds the verification server to
+loopback only.
