@@ -4,7 +4,7 @@ Verified on TRON on 2026-10-06/07, starting from V2 commit ff01d3f on feature-da
 
 ## Application checks
 
-- After the chat extension, npm run check passed: ESLint with zero warnings, generated Next route types and TypeScript, 101 deterministic tests, production build, and npm audit with zero vulnerabilities. Three model tests are opt-in and skipped by default.
+- After the chat extension and summary fix, npm run check passed: ESLint with zero warnings, generated Next route types and TypeScript, 103 deterministic tests, production build, and npm audit with zero vulnerabilities. Three model tests are opt-in and skipped by default.
 - The original two opt-in tests ran against the actual pinned Qwen3.5 4B/Ollama runtime during the accounting verification. They cover totals, month comparison, merchant filters, recurring candidates, refusing expense deletion, and a generated receipt image. The query test was rerun after adding conversations; receipt extraction was unchanged.
 - The production app binds to 127.0.0.1:3103; Ollama binds to 127.0.0.1:11435. Mounted endpoints rejected cross-origin and public Host requests with HTTP 403.
 
@@ -43,6 +43,12 @@ All verification used synthetic records, never private receipts.
 - Deterministic chat tests cover malformed/oversized inputs, no-AI mode, cross-origin rejection, UTF-8 stream boundaries, incomplete/invalid replies, truncation, shared-model generation serialization, cancellation, financial context isolation, suggestions, persisted drafts/modes, failed storage writes, external refresh, invalid history protection, and selected-chat context limits.
 
 Chat history is separate browser data and is not part of the financial workspace backup. JSON export is an archive; importing it on another machine is not implemented. Recent completed turns provide model context, not automatic cross-chat memory. Forecasting and a verified calculator remain unimplemented. General model answers can be inaccurate and have no live web access.
+
+### Expense-summary regression fix (2026-10-07)
+
+The actual model classified “tell me about my expenses” as unsupported. Known, standalone summary phrases now route directly to a verified categories report, without depending on model classification or previous conversation filters. With no dates they cover the selected report month; last-month and all-time variants are explicit. Matching is anchored to the whole question, so extra actions, forecast dates and specific filters still go through the guarded planner. The answer labels this source “Built-in expense summary”.
+
+The exact question returned $37.50 across two synthetic October records, including Food $12.50 and Bills $25.00, even after a previous forecast request. The model also correctly interpreted “Can you give me an overview of Food spending this month?” as Food $12.50. Tests cover empty records, prior filter reset, calendar boundaries and leap years, all-time scope, and rejecting instructions appended to summary wording. Unsupported replies now explain supported reports or suggest General chat instead of showing the same forecasting/calculator warning for every rejected question. The updated live conversation test passed, including financial follow-ups and scope suggestions.
 
 ## Practical limits
 

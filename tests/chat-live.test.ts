@@ -34,6 +34,14 @@ test("LIVE conversation remembers selected general chat, keeps personal finance 
     { id: "bills-now", date: "2026-10-03", description: "Synthetic service", category: "Bills", amount: 25, createdAt: 2 },
     { id: "food-before", date: "2026-09-01", description: "Synthetic lunch", category: "Food", amount: 10, createdAt: 3 },
   ];
+  const overview = await handlers.query(post({ question: "tell me about my expenses", month: "2026-10", expenses, suggestScope: true, context: { questions: ["What will next month's expenses be?"], plan: null } }, "query"));
+  const overviewResult = await overview.json() as QueryResponse;
+  assert.equal(overview.status, 200, JSON.stringify(overviewResult)); assert.equal(overviewResult.evidence.totalCents, 3750);
+  assert.equal(overviewResult.evidence.intent, "categories"); t.diagnostic(`User's exact expense overview: ${overviewResult.answer}`);
+  const filteredOverview = await handlers.query(post({ question: "Can you give me an overview of Food spending this month?", month: "2026-10", expenses }, "query"));
+  const filteredResult = await filteredOverview.json() as QueryResponse;
+  assert.equal(filteredOverview.status, 200, JSON.stringify(filteredResult)); assert.equal(filteredResult.evidence.filters.category, "Food"); assert.equal(filteredResult.evidence.totalCents, 1250);
+  t.diagnostic(`Model-interpreted filtered overview: ${filteredResult.answer}`);
   const context = { questions: ["How much did I spend on Food this month?"], plan: { intent: "total", allTime: false, from: "2026-10-01", to: "2026-10-31", category: "Food", merchant: null, search: null, compareFrom: null, compareTo: null } };
   const response = await handlers.query(post({ question: "And last month?", month: "2026-10", expenses, context }, "query"));
   const result = await response.json() as QueryResponse;

@@ -19,7 +19,7 @@ For another Windows x64 computer, repeat setup and restore a **full V3 workspace
 - Natural-language expense questions with interpreted filters and entry evidence; local receipt reading creates a review draft.
 - General AI chat popup with a conversation sidebar, local saved history, search, rename, deletion, draft preservation, streaming responses, and Stop. V3's Local AI area always uses Finance mode; the popup always uses General mode. Both use the same installed model.
 
-The local model selects queries; code calculates amounts in integer cents. AI never edits records. Receipt drafts and recurring candidates require review. The app covers expense bookkeeping rather than a complete general ledger or tax return. Backup files contain sensitive records and are not encrypted.
+Common summary requests such as “Tell me about my expenses” use a built-in verified report; the local model interprets other questions. Code calculates amounts in integer cents. A summary without dates covers the selected report month and includes category totals. You can also request last month or all time. AI never edits records. Receipt drafts and recurring candidates require review. The app covers expense bookkeeping rather than a complete general ledger or tax return. Backup files contain sensitive records and are not encrypted.
 
 ### Conversations and memory
 
