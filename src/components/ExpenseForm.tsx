@@ -9,10 +9,14 @@ import {
   validateExpense,
 } from "@/lib/expenses";
 import { todayISO } from "@/lib/format";
+import type { AccountingExpense, CategoryRule } from "@/types/accounting";
 
 interface ExpenseFormProps {
-  initial?: Expense;
-  onSubmit: (data: ExpenseInput) => void;
+  initial?: AccountingExpense;
+  defaults?: Partial<AccountingExpense>;
+  rules?: CategoryRule[];
+  onRememberRule?: (merchant: string, category: Category) => void;
+  onSubmit: (data: ExpenseInput & Partial<AccountingExpense>) => void;
   onCancel: () => void;
 }
 
@@ -26,8 +30,14 @@ function toFormValues(expense?: Expense): ExpenseFormValues {
   };
 }
 
-export default function ExpenseForm({ initial, onSubmit, onCancel }: ExpenseFormProps) {
-  const [values, setValues] = useState<ExpenseFormValues>(() => toFormValues(initial));
+export default function ExpenseForm({ initial, defaults, rules = [], onRememberRule, onSubmit, onCancel }: ExpenseFormProps) {
+  const [values, setValues] = useState<ExpenseFormValues>(() => ({ ...toFormValues(initial), ...(defaults ? { date: defaults.date ?? "", amount: defaults.amount?.toFixed(2) ?? "", category: defaults.category ?? "", description: defaults.description ?? "" } : {}) }));
+  const [merchant, setMerchant] = useState(initial?.merchant ?? defaults?.merchant ?? "");
+  const [project, setProject] = useState(initial?.project ?? defaults?.project ?? "");
+  const [account, setAccount] = useState(initial?.account ?? defaults?.account ?? "");
+  const [reimbursement, setReimbursement] = useState<AccountingExpense["reimbursement"]>(initial?.reimbursement ?? defaults?.reimbursement ?? "none");
+  const [reviewed, setReviewed] = useState(initial?.reviewed ?? false);
+  const rule = rules.find(item => item.merchant.trim().toLowerCase() === merchant.trim().toLowerCase());
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [submitted, setSubmitted] = useState(false);
 
@@ -43,7 +53,7 @@ export default function ExpenseForm({ initial, onSubmit, onCancel }: ExpenseForm
     setSubmitted(true);
     const result = validateExpense(values);
     setErrors(result.errors);
-    if (result.data) onSubmit(result.data);
+    if (result.data) onSubmit({ ...result.data, merchant: merchant.trim(), project: project.trim(), account: account.trim(), reimbursement, reviewed });
   };
 
   return (
@@ -117,6 +127,16 @@ export default function ExpenseForm({ initial, onSubmit, onCancel }: ExpenseForm
           {values.description.trim().length}/{MAX_DESCRIPTION}
         </p>
       </Field>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field id="merchant" label="Merchant"><input id="merchant" className="input" maxLength={100} value={merchant} onChange={e => setMerchant(e.target.value)} placeholder="e.g. Acme Supplies" /></Field>
+        <Field id="account" label="Payment account"><input id="account" className="input" maxLength={100} value={account} onChange={e => setAccount(e.target.value)} placeholder="e.g. Business checking" /></Field>
+        <Field id="project" label="Project or client"><input id="project" className="input" maxLength={100} value={project} onChange={e => setProject(e.target.value)} placeholder="Optional" /></Field>
+        <Field id="reimbursement" label="Reimbursement"><select id="reimbursement" className="input" value={reimbursement} onChange={e => setReimbursement(e.target.value as AccountingExpense["reimbursement"])}><option value="none">Not reimbursable</option><option value="pending">Awaiting reimbursement</option><option value="paid">Reimbursed</option></select></Field>
+      </div>
+      {rule && rule.category !== values.category && <button className="btn-secondary" type="button" onClick={() => update("category", rule.category)}>Use saved rule: {rule.category}</button>}
+      {onRememberRule && merchant.trim() && values.category && <button className="text-sm font-medium text-indigo-700 underline" type="button" onClick={() => onRememberRule(merchant.trim(), values.category as Category)}>Remember this merchant’s category</button>}
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} className="h-4 w-4 accent-indigo-600" /> I have reviewed this expense</label>
 
       <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
         <button type="button" onClick={onCancel} className="btn-secondary">
