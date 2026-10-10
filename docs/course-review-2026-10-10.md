@@ -2,6 +2,8 @@
 
 Reviewed 2026-10-10. Course: **Claude Code: Software Engineering with Generative AI Agents**, Vanderbilt University / Jules White. Project: `C:\Users\xmant\Documents\expense-tracker-ai`.
 
+This document records the historical V3 baseline at the start of the review. For implemented V4 behavior and current verification, see [V4 progress](v4-progress.md).
+
 ## Scope and evidence
 
 The authenticated Coursera connector and signed-in Chrome course pages were accessible. Review covered all **20 lecture transcripts**, **14 readings**, both completed dialogue histories, the completed Module 1 assessment overview, and the Module 6 final assignment instructions: **38 outline items across six modules**. Embedded prompts/code examples were read where rendered; the multimodal sketch was visually inspected. This was a source review, not a replay of every video or completion of the assessments.

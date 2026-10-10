@@ -42,10 +42,17 @@ Backup directory: C:\AI-Audit\backups\expense-v4-20261010 contains the executabl
 - Downloaded direct PDF independently parsed with pypdf: Café text and $12.50 amount preserved. Multipage/font behavior also covered by deterministic tests.
 - Browser acceptance: all 6 passed using isolated synthetic IndexedDB/SQLite and a test sync root. Includes actual downloads, invalid restore protection, successful combined restore/chat merge, OneDrive history, no-AI/share revocation and mobile/origin checks. Windows completed-download files need a bounded read/copy retry while temporary handles clear; no security policy was changed.
 - Separate scheduling-service integration passed: unauthenticated requests rejected; due local backup and OneDrive report executed; damaged schedule did not crash the worker.
-- Real Claude review job passed through the HTTP proxy; duplicate/conflicting requests, queued cancellation, events/replay and result retrieval verified. Edit/running-cancellation acceptance follows this checkpoint.
+- Real Claude review job passed through the HTTP proxy; duplicate/conflicting requests, queued cancellation, events/replay and result retrieval verified. Real Read and Write tools appeared in events. Write created only a synthetic worktree file. Running cancellation passed during preparation and after a live file-tool request. A stale-save cancellation race was fixed and regression-tested. Completed history survived service restarts.
+- Actual coding-history/result UI was verified in an isolated browser against the live service. The synthetic result/diff displayed; Run remained disabled until confirmation.
 
 ## Remaining boundaries
 
 Schedules repeat a captured snapshot and do not see future browser edits. Refresh the capture after changes. No live cross-device ledger sync, automatic retry of uncertain cloud deliveries, public agent access, automatic merge or deployment. OneDrive cloud completion is owned by the desktop sync app; Graph/Sheets account connections were not configured. Generated backup/export files are retained without automatic pruning. The combined restore is two explicit store operations, not an atomic transaction across browser IndexedDB and server SQLite. Credentials and worktrees do not transfer in backups.
 
 Windows native Claude worktrees/file restrictions are not an OS sandbox. Jobs receive a minimal runtime environment without the application's provider secrets. Job success is not proof that proposed edits pass checks. Course assessment fields/submissions were not changed.
+
+## Checkpoints and next step
+
+67bb3c9 introduced V4; 2d02125 added scheduling acceptance and hardened boundaries; 1046673 fixed cancellation during worktree preparation. This branch retains V3 for rollback and has not been merged or pushed. Runtime test artifacts remain under ignored work/ and .runtime/agent-worktrees. Only synthetic files were saved to the installed OneDrive folder; personal records were not used in cloud or coding-job smoke tests.
+
+The final app, local model and agent/scheduling service are running. Open http://127.0.0.1:3103 in your existing browser/profile. Use Start-V4.cmd after stopping or rebooting. Export Data previews a selection before PDF/download or cloud confirmation; Backup provides the portable archive; Integrations shows history and schedules; Coding agent runs scoped worktree jobs. Review a PDF and OneDrive snapshot first. Live Graph/Sheets setup, Dropbox and cross-device ledger synchronization remain separate follow-up work.
