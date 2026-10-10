@@ -19,6 +19,8 @@ Verification on 2026-10-10:
 
 Account creation, subscriptions, quotas and optional provider consents remain the destination user's actions. [GitHub Windows CI](https://github.com/i-xzvr/expense-tracker-ai/actions/workflows/verify.yml) repeats app/browser, onboarding and real signed-out CLI installation/update checks on published changes. The 0.4.0 hosted/source-install results below are historical, not claims of a new physical-machine test for 0.4.1.
 
+The new hosted CLI test requires the same pinned portable Node as the installer; CI bootstraps it with `Setup-V3.ps1 -RuntimeOnly -NoAI` before the CLI check. The first new workflow run omitted that precondition and failed the tool check after app/onboarding passed; the workflow was corrected rather than allowing an arbitrary global Node.
+
 ## 0.4.0 retained historical acceptance
 
 Verified on 2026-10-10. A repository upload alone does not prove installation works. The following evidence was collected:
