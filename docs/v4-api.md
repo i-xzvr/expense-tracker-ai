@@ -67,7 +67,7 @@ The separate service listens on 127.0.0.1:3105 and requires an unguessable local
 
 | Service route | Contract |
 | --- | --- |
-| GET /health | Process readiness; does not reauthenticate Claude on every request |
+| GET /health | {ready:true,agent:boolean,worker:true}; agent reflects startup installation/login checks, not current quota or per-request authentication |
 | POST /api/v1/jobs | {task,profile:review or edit,requestId:UUID,confirmed:true}; HTTP 202; stable requestId deduplicates creation |
 | GET /api/v1/jobs | {jobs:[...]}, newest 100 |
 | GET /api/v1/jobs/{id} | Durable job including state/cancelRequested/result/workspace |
@@ -76,5 +76,29 @@ The separate service listens on 127.0.0.1:3105 and requires an unguessable local
 | POST /api/v1/jobs/{id}/cancel | {}; cancellation requested; actual terminal state comes later |
 
 States: queued -> running -> succeeded/failed/cancelled. At most 10 pending jobs, one execution worker, 16 KiB input, 6,000-char task, 2 MiB process output cap, 100,000-char stored result, 120-second execution timeout, $1 API budget flag. CLI budget estimates/limits follow the account/provider; subscription usage is not an invoice guarantee.
+
+If Claude was skipped or unavailable at startup, POST jobs returns 503 AGENT_DISABLED without queuing work. Finance, job-history reads and scheduling remain available. Setup installs a pinned project-local CLI; restart after signing in. V4_GIT_EXE/V4_CLAUDE_EXE are launcher-supplied server paths, not browser fields.
+
+## Local API examples
+
+Run Start-V4.cmd first. Requests from external/public hosts and cross-site browser origins are rejected. Same-origin browser calls need no key; the coding proxy obtains its generated bearer token server-side. Never distribute that token or expose port 3105 publicly.
+
+```powershell
+Invoke-RestMethod 'http://127.0.0.1:3103/api/ai/status'
+Invoke-RestMethod 'http://127.0.0.1:3103/api/agent/health'
+Invoke-RestMethod 'http://127.0.0.1:3103/api/v4/history'
+
+$request = @{
+  expenses = @(@{id='synthetic-demo';date='2026-01-01';amount=12.50;category='Food';description='Synthetic lunch';createdAt=1})
+  scope='all'; filters=@{search='';category='All';startDate='';endDate=''}
+  generatedAt=[DateTime]::UtcNow.ToString('o');format='pdf'
+  filename='Synthetic report';template='Detailed expenses'
+} | ConvertTo-Json -Depth 8
+Invoke-WebRequest -UseBasicParsing -Method Post -Uri 'http://127.0.0.1:3103/api/v4/export' -ContentType 'application/json' -Body $request -OutFile 'Synthetic report.pdf'
+```
+
+This produces only a synthetic export/history row; it does not add browser expenses. `scripts/smoke-v4.mjs` also parses the returned PDF and checks its history total. For coding review, POST the documented job body to `/api/agent/api/v1/jobs`, then poll `/api/agent/api/v1/jobs/{id}` and `/result`. This calls your Claude account and consumes its normal usage. A result is review material, not automatic installation of generated changes.
+
+Provider endpoints/credentials and internal modules are listed in [dependencies](v4-dependencies.md). [Installation](v4-installation.md) explains runtime/configuration boundaries and another-machine authorization.
 
 Each job uses a new worktree from committed HEAD, not uncommitted changes. Review tools are Read/Glob/Grep; edit adds Edit/Write. Claude restricted mode confines file tools; shell/web/MCP and slash commands are unavailable. Worktrees are retained for inspection; success does not imply tests passed or active files were changed. Restart marks interrupted runs failed. Job result APIs poll, while the CLI adapter consumes NDJSON internally. The current release does not claim SSE streaming or automatic merge/deploy.

@@ -10,9 +10,9 @@ Sequence completed: platform/Claude repair and V3 backup; API/export foundation;
 
 ## Platform
 
-Windows 11 x64; Intel i7-12650H, 16 logical processors, approximately 64 GB RAM; ample free disk. Pinned Node 24.19.0/npm 11.17.0 and Git 2.55/Git Bash verified. Claude 2.1.296 repaired using its official package installer after backing up a 500-byte placeholder. Existing account authentication and a tool-free live CLAUDE_V4_READY request succeeded. App startup, Ollama/model readiness and service health were verified. No elevation or operating-system security changes were needed.
+Windows 11 x64 verification host. Pinned Node 24.19.0/npm 11.17.0, Git/Git Bash and Claude 2.1.296 verified. Existing account authentication and a tool-free live request succeeded. App startup, Ollama/model readiness and service health were verified. The release installer now supplies portable Git 2.56.0.windows.2 and project-local Claude. No elevation or operating-system security changes were needed.
 
-Backup directory: C:\AI-Audit\backups\expense-v4-20261010 contains the executable placeholder, V3 configuration and stopped-server data. Browser IndexedDB is separate and was not included in that server backup. V4 retains the same browser origin, so existing financial records remain accessible. For rollback, stop V4, use the retained feature-data-export-v3 branch and V3 launchers; restore configuration from the backup only if needed. The broken executable placeholder is diagnostic, not a useful runtime rollback.
+Pre-upgrade server data/configuration were backed up locally; those private backups are excluded from this repository. Browser IndexedDB is separate and was not included in the server backup. V4 retains the same browser origin, so existing financial records remain accessible. For another-machine transfer and rollback, use the [V4 installation guide](v4-installation.md) and a verified combined backup.
 
 ## Course coverage
 

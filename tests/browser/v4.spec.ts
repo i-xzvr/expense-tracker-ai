@@ -3,9 +3,11 @@ import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 async function saveDownload(download:import("@playwright/test").Download,path:string){
   expect(await download.failure()).toBeNull();
-  // Windows antivirus/indexers can briefly hold a completed Chromium file.
+  // A completed Windows copy can briefly retain a handle. Do not recopy on
+  // every read retry: that reacquires the handle we are waiting to release.
   let bytes:Buffer=Buffer.alloc(0);
-  await expect(async()=>{await download.saveAs(path);bytes=await readFile(path);}).toPass({timeout:10_000,intervals:[200,500,1000]});
+  await expect(async()=>{await download.saveAs(path);}).toPass({timeout:10_000,intervals:[200,500,1000]});
+  await expect(async()=>{bytes=await readFile(path);}).toPass({timeout:10_000,intervals:[200,500,1000]});
   return bytes;
 }
 async function seed(page:import("@playwright/test").Page){

@@ -21,21 +21,24 @@ const token=readFileSync(process.env.V4_SERVICES_TOKEN_PATH??join(root,".runtime
 const store=openJobs(process.env.V4_JOBS_PATH??join(root,"data","v4-jobs.sqlite"));
 store.recover();
 const run=promisify(execFile);
+const git=process.env.V4_GIT_EXE||"git";
+const agentEnabled=!!process.env.V4_CLAUDE_EXE;
 let busy=false,stopping=false,current:{job:CodingJob;child:ReturnType<typeof spawn>}|null=null;
 const safeMessage=(e:unknown)=>e instanceof Error&&e.message.includes("worktree")?"Git could not prepare the isolated worktree.":"Execution could not complete. Check local runtime and authentication.";
 async function execute(job:CodingJob){
   const workspace=join(root,".runtime","agent-worktrees",job.id);
   const branch="codex/agent-"+job.id;
   mkdirSync(dirname(workspace),{recursive:true});
-  await run("git",["worktree","add","-b",branch,workspace,"HEAD"],{cwd:root,windowsHide:true,timeout:30_000});
+  await run(git,["worktree","add","-b",branch,workspace,"HEAD"],{cwd:root,windowsHide:true,timeout:30_000});
   job.workspace=workspace;store.save(job);store.event(job.id,"Isolated worktree created from committed HEAD; ignored financial data and credentials are not copied.");
   if(job.cancelRequested){job.state="cancelled";store.save(job);store.event(job.id,"Cancelled during worktree preparation; Claude was not started.");return;}
   const tools=job.profile==="review"?"Read,Glob,Grep":"Read,Glob,Grep,Edit,Write";
-  const binary=process.env.V4_CLAUDE_EXE??join(process.env.USERPROFILE??""," .local".trim(),"npm","node_modules","@anthropic-ai","claude-code","bin","claude.exe");
+  const binary=process.env.V4_CLAUDE_EXE!;
   const args=["-p",job.task,"--restricted","--tools",tools,"--allowedTools",tools,"--permission-prompts","none","--strict-mcp-config","--mcp-config",'{"mcpServers":{}}',"--disable-slash-commands","--no-session-persistence","--output-format","stream-json","--verbose","--model","sonnet","--max-budget-usd","1"];
   const childEnvironment:NodeJS.ProcessEnv={NODE_ENV:"production"};
   for(const key of ["PATH","Path","USERPROFILE","APPDATA","LOCALAPPDATA","TEMP","TMP","SystemRoot","SYSTEMROOT","WINDIR","COMSPEC","HOME","HOMEDRIVE","HOMEPATH","PROGRAMFILES","ProgramFiles","PROGRAMFILES(X86)","ProgramFiles(x86)","ProgramW6432","USERNAME"]){if(process.env[key])childEnvironment[key]=process.env[key];}
-  childEnvironment.CLAUDE_CODE_GIT_BASH_PATH=process.env.CLAUDE_CODE_GIT_BASH_PATH??"C:\\Program Files\\Git\\bin\\bash.exe";
+  if(process.env.CLAUDE_CODE_GIT_BASH_PATH)childEnvironment.CLAUDE_CODE_GIT_BASH_PATH=process.env.CLAUDE_CODE_GIT_BASH_PATH;
+  childEnvironment.DISABLE_AUTOUPDATER="1";
   childEnvironment.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1";
   const child=spawn(binary,args,{cwd:workspace,windowsHide:true,stdio:["ignore","pipe","pipe"],env:childEnvironment});
   current={job,child};let output="",pending="",failure="",totalBytes=0;const decoder=new StringDecoder("utf8");
@@ -44,10 +47,10 @@ async function execute(job:CodingJob){
   child.stdout.on("data",(data:Buffer)=>{totalBytes+=data.length;if(totalBytes>2_000_000){failure="Agent output exceeded its limit.";child.kill();return;}pending+=decoder.write(data);const lines=pending.split("\n");pending=lines.pop()??"";for(const line of lines){try{const event=JSON.parse(line);if(event.type==="result"){output=String(event.result??"");if(event.is_error)failure="Claude reported execution failure."; }else if(event.type==="assistant"){store.event(job.id,"Agent response received.");for(const block of event.message?.content??[]){if(block.type==="tool_use"&&["Read","Glob","Grep","Edit","Write"].includes(block.name))store.event(job.id,"File tool requested: "+block.name);}}}catch{/* Partial/unrecognized frames do not count as success. */}}});
   child.stderr.on("data",()=>{store.event(job.id,"Agent runtime diagnostic received (raw diagnostics omitted).");});
   const code=await new Promise<number|null>((accept,reject)=>{child.once("error",reject);child.once("close",accept);}).finally(()=>{clearTimeout(deadline);clearInterval(cancellation);current=null;});
-  const tracked=await run("git",["diff","--no-ext-diff","--stat"],{cwd:workspace,windowsHide:true,maxBuffer:256_000});
-  const changed=await run("git",["status","--porcelain"],{cwd:workspace,windowsHide:true,maxBuffer:256_000});
+  const tracked=await run(git,["diff","--no-ext-diff","--stat"],{cwd:workspace,windowsHide:true,maxBuffer:256_000});
+  const changed=await run(git,["status","--porcelain"],{cwd:workspace,windowsHide:true,maxBuffer:256_000});
   // Include new files in review artifacts without committing generated changes.
-  const diff=await run("git",["diff","--no-ext-diff"],{cwd:workspace,windowsHide:true,maxBuffer:1024_000});
+  const diff=await run(git,["diff","--no-ext-diff"],{cwd:workspace,windowsHide:true,maxBuffer:1024_000});
   job.diff=changed.stdout+"\n"+tracked.stdout+"\n"+diff.stdout.slice(0,500_000);
   job.cancelRequested=store.get(job.id)?.cancelRequested ?? cancelled;
   cancelled ||= job.cancelRequested;
@@ -58,7 +61,7 @@ async function execute(job:CodingJob){
 }
 function dirname(path:string){return resolve(path,"..");}
 async function tick(){
-  if(busy||stopping)return;busy=true;
+  if(busy||stopping||!agentEnabled)return;busy=true;
   try{const job=store.claim();if(job?.state==="running"){try{await execute(job);}catch(e){job.state="failed";job.error=safeMessage(e);store.save(job);store.event(job.id,job.error);}}}
   finally{busy=false;}
 }
@@ -102,6 +105,7 @@ const server=createServer(async(req,res)=>{
     else if(method==="GET"&&url.pathname==="/health")response=json({ready:true,agent:!!process.env.V4_CLAUDE_EXE,worker:true});
     else if(url.pathname==="/api/v1/jobs"&&method==="GET")response=json({jobs:store.list().map(j=>({id:j.id,task:j.task,profile:j.profile,state:j.state,createdAt:j.createdAt,updatedAt:j.updatedAt,cancelRequested:j.cancelRequested,workspace:j.workspace,error:j.error}))});
     else if(url.pathname==="/api/v1/jobs"&&method==="POST"){
+      if(!agentEnabled)throw new V4Error(503,"AGENT_DISABLED","Claude coding jobs are not connected. Run Setup-V4.cmd to install and sign in.");
       const body=await localJson(request,16_384);
       if(!isObject(body)||typeof body.task!=="string"||!body.task.trim()||body.task.length>6000||!["review","edit"].includes(String(body.profile))||typeof body.requestId!=="string"||!/^[a-f0-9-]{36}$/.test(body.requestId)||body.confirmed!==true)throw new V4Error(400,"INVALID_JOB","Confirm a scoped review or edit job.");
       if(!store.byRequest(body.requestId)&&store.list().filter(j=>j.state==="queued"||j.state==="running").length>=10)throw new V4Error(429,"QUEUE_FULL","At most ten jobs may be pending.");

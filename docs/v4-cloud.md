@@ -4,7 +4,7 @@ No provider credentials are committed. Configure .env.local on this laptop, then
 
 ## Installed OneDrive folder (selected first integration)
 
-V4 automatically uses the installed personal OneDrive folder from OneDriveConsumer/OneDrive environment variables; V4_ONEDRIVE_ROOT is a server-only override for an already configured sync root. This laptop's folder and OneDrive process were verified. No application registration or new sign-in grant is needed for this path.
+V4 automatically uses the installed personal OneDrive folder from OneDriveConsumer/OneDrive environment variables; V4_ONEDRIVE_ROOT is a server-only override for an already configured sync root. Verify your desktop client is installed and signed in on the destination machine. No application registration or new sign-in grant is needed for this path.
 
 Select Installed OneDrive sync folder in Export Data, preview the records and confirm. Files go to Expense Tracker V4/Reports. Combined backups go to Expense Tracker V4/Backups and require a separate confirmation because they include receipts/chats. Unique names preserve earlier files; the local bytes are read back and SHA256 verified. Folder junctions resolving outside the configured root are rejected.
 

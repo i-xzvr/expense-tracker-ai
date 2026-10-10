@@ -2,7 +2,7 @@
 
 - Windows local app; pinned portable Node 24.19.0/npm 11.17.0.
 - App: http://127.0.0.1:3103; local Ollama: 11435; V4 coding/scheduling services: 3105.
-- Start-V4.cmd / Stop-V4.cmd manage owned processes. Setup-V4.cmd reuses pinned V3 setup and verifies Claude.
+- Start-V4.cmd / Stop-V4.cmd manage owned processes. Setup-V4.cmd installs pinned project-local tools and optional AI/Claude; see docs/v4-installation.md.
 - Financial workspace stays in browser IndexedDB at the existing origin/schema. SQLite chats remain data/chats.sqlite; V4 operational metadata and jobs use separate SQLite files.
 - Financial totals, filters and report evidence are deterministic integer-cent code. AI is optional: interpretation, selected-report explanations and reviewed receipt drafts. Never use model totals as accounting values or silently mutate/send records.
 - General chat remains bounded to the selected conversation. Coding jobs use a separate Claude process in an isolated worktree from committed HEAD.

@@ -1,6 +1,6 @@
 # Course review and expense-tracker baseline
 
-Reviewed 2026-10-10. Course: **Claude Code: Software Engineering with Generative AI Agents**, Vanderbilt University / Jules White. Project: `C:\Users\xmant\Documents\expense-tracker-ai`.
+Reviewed 2026-10-10. Course: **Claude Code: Software Engineering with Generative AI Agents**, Vanderbilt University / Jules White. Project: Expense Tracker AI. This document summarizes course concepts and references original course pages; it does not redistribute course transcripts or assessments.
 
 This document records the historical V3 baseline at the start of the review. For implemented V4 behavior and current verification, see [V4 progress](v4-progress.md).
 

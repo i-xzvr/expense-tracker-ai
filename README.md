@@ -1,10 +1,24 @@
 # Expense Tracker V4
 
-Local Windows expense bookkeeping with private AI assistance. Open the app through **Start-V4.cmd** after running **Setup-V4.cmd** once.
+Local Windows expense bookkeeping with optional local AI, direct PDF exports, portable backups, cloud export adapters, and an isolated Claude coding-job server.
+
+## Install V4
+
+Download [the source ZIP](https://github.com/i-xzvr/expense-tracker-ai/archive/refs/heads/main.zip), extract it into a new writable folder, and double-click **Setup-V4.cmd**. No preinstalled Node, Git, Ollama, or administrator account is needed. The interactive installer checks Windows/ports, installs verified pinned runtimes and modules, offers local AI and Claude login, optionally collects cloud settings, runs the required checks, and starts V4 at **http://127.0.0.1:3103**. Initial AI downloads take several GB and can take time.
+
+For a setup with no accounts or AI downloads, open PowerShell in the extracted folder:
+
+```powershell
+.\Setup-V4.cmd -NonInteractive -NoAI -SkipAgent
+```
+
+Use **Start-V4.cmd** thereafter and **Stop-V4.cmd** before updates. Supported installer platform: Windows x64 (Windows 11 tested; Windows 10 22H2 minimum), PowerShell 5.1+. macOS/Linux/ARM64 installers are not supplied. Finance/PDF need no API key. Claude jobs require a Claude Code account/login; cloud providers are optional.
+
+**[Complete installation and transfer guide](docs/v4-installation.md)** · [Prerequisites, modules and connections](docs/v4-dependencies.md) · [API contracts and examples](docs/v4-api.md) · [Cloud authorization](docs/v4-cloud.md) · [Release verification](docs/v4-release-verification.md)
 
 ## V4 additions
 
-V4 retains the same browser origin, IndexedDB financial workspace, SQLite chats and optional local AI. Use **Start-V4.cmd** / **Stop-V4.cmd** for the complete app, Ollama and coding/scheduling service. Existing V3 launchers start only the app/model, so use the V4 launcher for jobs and schedules. Setup-V4.cmd reuses the pinned V3 installer and checks your existing Claude installation/login; it does not register a new Claude account.
+V4 retains the same browser origin, IndexedDB financial workspace, SQLite chats and optional local AI. Use **Start-V4.cmd** / **Stop-V4.cmd** for the complete app, Ollama and coding/scheduling service. Existing V3 launchers start only the app/model. Setup-V4.cmd uses the pinned runtime installer, installs project-local Git and optional Claude, checks your login, and starts V4. It does not register or purchase accounts.
 
 - Export Data: CSV, JSON and direct PDF; custom filenames; independent date/category/search selection; four report templates; deterministic preview and optional local AI explanation.
 - Integrations: export history, captured-snapshot schedules, installed OneDrive folder delivery, optional Microsoft Graph and Google Sheets adapters.
@@ -25,9 +39,9 @@ For development: **npm run check** includes lint, types, tests, production build
 
 ## Install and transfer
 
-Extract the complete source package to a writable folder, double-click Setup-V3.cmd, then Start-V3.cmd. Setup installs pinned portable Node, Ollama, and Qwen3.5 4B, verifies checksums and model blobs, installs the lockfile, and runs the application checks. Internet is needed for first setup; normal installed operation uses local services. Stop-V3.cmd stops this copy.
+Use Setup-V4.cmd and the [V4 installation guide](docs/v4-installation.md) for new installations. Internet is needed for first setup; installed finance and Ollama run locally. Claude and live cloud exports require their providers online.
 
-For another Windows x64 computer, repeat setup and restore a **full V3 workspace backup** from the Backup screen. Financial records and receipts live in the browser, separately from program/model files. Keep the same browser profile and http://127.0.0.1:3103 address. [Installation, smaller-model, no-AI, and offline-transfer guide](docs/v3-installation.md).
+For another supported Windows x64 computer, repeat setup and restore a **combined V4 backup** through Portable Backup. Financial records and receipts live in the browser, separately from program/model files; chats are in SQLite. The GitHub repository contains program source, not your personal records, passwords, tokens, or AI model binaries. Use the same browser profile and http://127.0.0.1:3103 address for the same workspace. The [V3 guide](docs/v3-installation.md) describes the retained legacy launchers.
 
 ## Features
 

@@ -26,6 +26,8 @@ test("Real scheduling service protects its API, copies due snapshots and survive
     while(!logs.includes("V4 services listening")){if(child.exitCode!==null)throw new Error("Test service exited before readiness.");if(Date.now()>deadline)throw new Error("Test service readiness timed out.");await new Promise(r=>setTimeout(r,100));}
     assert.equal((await fetch(base+"/health")).status,401);
     assert.equal((await fetch(base+"/health",{headers})).status,200);
+    assert.equal((await fetch(base+"/health",{headers}).then(r=>r.json())).agent,false);
+    assert.equal((await fetch(base+"/api/v1/jobs",{method:"POST",headers:{...headers,"Content-Type":"application/json"},body:JSON.stringify({task:"Review synthetic source",profile:"review",confirmed:true,requestId:randomUUID()})})).status,503);
     const finished=Date.now()+22_000;
     while(!readdirSync(join(root,"data")).includes("v4-scheduled-backups")){if(Date.now()>finished)throw new Error("Due backup did not execute.");await new Promise(r=>setTimeout(r,200));}
     let complete=false;
