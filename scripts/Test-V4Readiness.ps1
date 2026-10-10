@@ -18,7 +18,7 @@ try {
         $native = Get-V4Claude
         if (-not $native) { throw 'Pinned Claude is missing. Rerun Setup-V4.cmd.' }
         $version = & $native --version
-        if ($LASTEXITCODE -ne 0 -or $version -notlike "$($script:V4Tools.claudeVersion) *") { throw 'Claude executable/version verification failed.' }
+        if ($LASTEXITCODE -ne 0 -or $version -notlike "$(Get-V4ClaudeVersion) *") { throw 'Claude executable/version verification failed.' }
         $loggedIn = Get-V4ClaudeAuth $native
         if (-not $loggedIn) { throw 'Claude is signed out. Rerun interactive Setup-V4.cmd or run scripts/Claude-V4.ps1 auth login.' }
     }

@@ -1,6 +1,6 @@
 # V4 prerequisites, modules, APIs and credentials
 
-The installer supports local Windows x64. [Installation](v4-installation.md) is the operational guide; [API contracts](v4-api.md) cover requests/errors; [cloud setup](v4-cloud.md) covers consent and delivery semantics. Versions below are release pins, not promises of indefinitely newest versions.
+The installer supports local Windows x64. [Installation](v4-installation.md) is the operational guide; [API contracts](v4-api.md) cover requests/errors; [cloud setup](v4-cloud.md) covers consent and delivery semantics. Versions below are tested release baselines. Enabled Claude/Ollama tools are checked for stable updates during setup; resolved versions are private to that installation. App/Node/Git/model pins remain fixed.
 
 ## Installed apps and runtime tools
 
@@ -9,14 +9,14 @@ The installer supports local Windows x64. [Installation](v4-installation.md) is 
 | Windows PowerShell | 5.1+ already included with supported Windows | Launcher, downloads, config, Windows DPAPI; no account/API key |
 | Node.js / npm | 24.19.0 / 11.17.0, portable under `.runtime` | Next/server/test runtime; built-in `node:sqlite`; no separate DB install |
 | Git for Windows | 2.56.0.windows.2 portable, SHA256-pinned | ZIP baseline and isolated agent worktrees; bundled Git Bash; public clone needs no GitHub login |
-| Ollama | 0.40.0 portable, optional | Loopback-only inference, cloud disabled; no API key |
+| Ollama | 0.40.2 tested portable baseline, optional; latest stable checked during setup | Loopback-only inference, cloud disabled; no account/API key |
 | Qwen3.5 | 4B default or 2B, manifests/digests in `config/local-ai.json` | Local finance interpretation, general chat, receipt draft; model downloaded/verified, not stored in GitHub |
-| Claude Code | 2.1.296, optional project-local npm integrity lock | Repository jobs, explicit scoped read/edit tools; your own Claude Code login, normal account limits; not finance inference |
+| Claude Code | 2.1.296 tested baseline, optional; latest stable checked/staged during setup | Repository jobs; destination user's explicitly confirmed eligible profile login, normal account limits; no publisher account or inherited API key |
 | Edge / Chrome | Your current installed browser | IndexedDB financial workspace; no browser account required |
 | OneDrive desktop | Your installed/signed-in client, optional | Selected reports/backups to existing sync folder; V4 needs no new app registration for this adapter |
 | Playwright Chromium | Browser matching locked Playwright 1.64.0, developer opt-in | Automated isolated UI checks; downloaded via `npx playwright install chromium`, not required for normal app use |
 
-Exact runtime checksums and URLs: [local-ai.json](../config/local-ai.json), [v4-tools.json](../config/v4-tools.json). Claude's package/optional native binary integrity: [runtime lockfile](../config/claude-runtime/package-lock.json). Sources: [Node downloads](https://nodejs.org/en/download), [Git portable release](https://github.com/git-for-windows/git/releases/tag/v2.56.0.windows.2), [Ollama release](https://github.com/ollama/ollama/releases/tag/v0.40.0), [Claude setup](https://code.claude.com/docs/en/setup). Claude and model redistribution remain subject to their upstream terms; the repository distributes source/configuration and download instructions, not bundled proprietary binaries.
+Exact runtime checksums and URLs: [local-ai.json](../config/local-ai.json), [v4-tools.json](../config/v4-tools.json). Claude's package/optional native binary integrity: [runtime lockfile](../config/claude-runtime/package-lock.json). Sources: [Node downloads](https://nodejs.org/en/download), [Git portable release](https://github.com/git-for-windows/git/releases/tag/v2.56.0.windows.2), [Ollama release](https://github.com/ollama/ollama/releases/tag/v0.40.2), [Claude setup](https://code.claude.com/docs/en/setup). Claude and model redistribution remain subject to their upstream terms; the repository distributes source/configuration and download instructions, not bundled proprietary binaries.
 
 ## Application npm modules
 
@@ -65,7 +65,7 @@ The pinned ESLint Next override uses `tinyglobby@0.2.17` for its glob dependency
 | Product HTTP API | `http://127.0.0.1:3103/api/*`, same-origin JSON validation | None; local-only, not public hosting authentication |
 | Coding/scheduling HTTP | `http://127.0.0.1:3105`, bearer; browser uses `/api/agent/*` | Per-install random token generated locally; never entered by the user or exposed to browser |
 | Ollama | `http://127.0.0.1:11435/api/chat`, `/api/version`, `/api/tags` | Launcher sets base/model; no key or subscription |
-| Claude Code | Anthropic account endpoints via native CLI | User authenticates with pinned CLI; `.env.local` Anthropic keys/Bedrock/Foundry/Vertex credentials are not forwarded to jobs in this release |
+| Claude Code | Anthropic account endpoints via native CLI | User confirms their own profile login or signs in/creates an eligible account; inherited API keys/Bedrock/Foundry/Vertex variables are not forwarded to installer Claude invocations or jobs |
 | Installed OneDrive | Local sync root / `Expense Tracker V4/{Reports,Backups}` | Desktop Microsoft login; optional `V4_ONEDRIVE_ROOT`; no app ID/client secret |
 | Microsoft OAuth / Graph | `login.microsoftonline.com/{tenant}/oauth2/v2.0/{devicecode,token}`; `graph.microsoft.com/v1.0/me/drive`; delegated `Files.ReadWrite offline_access` | Public `V4_MS_CLIENT_ID`, optional `V4_MS_TENANT`; user device sign-in; DPAPI token vault generated locally; no client secret |
 | Google OAuth / Sheets | `oauth2.googleapis.com/token`, `sheets.googleapis.com/v4/spreadsheets`; `https://www.googleapis.com/auth/spreadsheets` | Refresh token + OAuth client ID/secret, or short-lived access token; editable spreadsheet ID chosen in UI; API key alone insufficient |
@@ -76,7 +76,7 @@ Environment examples and exact names: [.env.example](../.env.example). Secrets s
 
 ## Network and storage
 
-Setup contacts `nodejs.org`, `github.com` and GitHub release asset/CDN domains, `registry.npmjs.org`, and (if local AI selected) `registry.ollama.ai` plus its blob download hosts. HTTPS/TLS access is needed; curl downloads resume and verify hashes before execution. App dependency audit contacts the npm registry. Claude and optional provider operations need their official authentication/API endpoints; see [Anthropic network requirements](https://code.claude.com/docs/en/network-config). Playwright browser installation uses Microsoft's Playwright CDN. Corporate proxies/policies must permit the selected providers; scripts do not weaken TLS or bypass policy.
+Setup contacts `nodejs.org`, `github.com`, `api.github.com` for stable Ollama metadata, and GitHub release asset/CDN domains, `registry.npmjs.org`, and (if local AI selected) `registry.ollama.ai` plus its blob download hosts. HTTPS/TLS access is needed; curl downloads resume and verify hashes before execution. App dependency audit contacts the npm registry. Claude and optional provider operations need their official authentication/API endpoints; see [Anthropic network requirements](https://code.claude.com/docs/en/network-config). Playwright browser installation uses Microsoft's Playwright CDN. Corporate proxies/policies must permit the selected providers; scripts do not weaken TLS or bypass policy.
 
 | Location | Contents / transfer boundary |
 | --- | --- |

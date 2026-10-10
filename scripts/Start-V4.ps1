@@ -15,7 +15,7 @@ try {
     $candidate = Get-V4Claude
     if ($candidate) {
       $version = & $candidate --version
-      if ($LASTEXITCODE -ne 0 -or $version -notlike "$($script:V4Tools.claudeVersion) *") { throw 'Claude version check failed. Rerun Setup-V4.cmd.' }
+      if ($LASTEXITCODE -ne 0 -or $version -notlike "$(Get-V4ClaudeVersion) *") { throw 'Claude version check failed. Rerun Setup-V4.cmd.' }
       if (Get-V4ClaudeAuth $candidate) { $native = $candidate; $git = Get-V4Git }
     }
     if (-not $native) { Write-Host 'Claude is unavailable or signed out. Coding jobs are disabled; rerun Setup-V4.cmd to connect them. Finance and scheduling will start.' }
@@ -30,6 +30,7 @@ try {
   $tsx = Join-Path $script:V3Root 'node_modules/tsx/dist/cli.mjs'
   $serviceScript = Join-Path $script:V3Root 'scripts/v4/services.ts'
   $serviceEnvironment = @{ V4_CLAUDE_EXE=$native; V4_GIT_EXE=$git; V4_REPOSITORY=$script:V3Root; V4_SERVICES_TOKEN_PATH=$tokenPath; NEXT_TELEMETRY_DISABLED='1'; DISABLE_AUTOUPDATER='1' }
+  if ($env:CLAUDE_CONFIG_DIR) { $serviceEnvironment.CLAUDE_CONFIG_DIR = $env:CLAUDE_CONFIG_DIR }
   if ($git) {
     $serviceEnvironment.PATH = [IO.Path]::GetDirectoryName($git) + ';' + $env:PATH
     $bash = Join-Path $script:V3Runtime "$($script:V4Tools.git.directory)/bin/bash.exe"

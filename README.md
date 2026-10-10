@@ -16,7 +16,7 @@ Use **Start-V4.cmd** thereafter and **Stop-V4.cmd** before updates. Supported in
 
 **[Complete installation and transfer guide](docs/v4-installation.md)** · [Prerequisites, modules and connections](docs/v4-dependencies.md) · [API contracts and examples](docs/v4-api.md) · [Cloud authorization](docs/v4-cloud.md) · [Release verification](docs/v4-release-verification.md)
 
-For a retained version rather than moving main, use the [V4 0.4.0 release](https://github.com/i-xzvr/expense-tracker-ai/releases/tag/v0.4.0) and its source ZIP/checksum. The automated [Windows verification workflow](https://github.com/i-xzvr/expense-tracker-ai/actions/workflows/verify.yml) runs app and browser checks without account credentials. Upstream license notices and source provenance are in [NOTICE.md](NOTICE.md).
+For a retained version rather than moving main, use the [V4 0.4.1 release](https://github.com/i-xzvr/expense-tracker-ai/releases/tag/v0.4.1) and its source ZIP/checksum. Setup checks/updates enabled managed Claude/Ollama tools and asks each destination user to confirm their own login, sign in, create an account or skip Claude. Local Ollama/Qwen needs no account/key. See the [installer guide](docs/v4-installation.md) for account eligibility, unattended flags and rollback. The automated [Windows verification workflow](https://github.com/i-xzvr/expense-tracker-ai/actions/workflows/verify.yml) runs app and browser checks without account credentials. Upstream license notices and source provenance are in [NOTICE.md](NOTICE.md).
 
 ## V4 additions
 

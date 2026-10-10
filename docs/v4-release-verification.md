@@ -1,6 +1,25 @@
 # V4 public-release verification
 
-Release line: V4, npm package version 0.4.0. Source repository: https://github.com/i-xzvr/expense-tracker-ai.
+Release line: V4. Source repository: https://github.com/i-xzvr/expense-tracker-ai.
+
+## 0.4.1 destination-user account and AI updates
+
+This revision removes silent reuse of a detected Claude login. Interactive setup offers account confirmation, provider login/change-account, signup guidance or skip; unattended setup requires explicit `-UseExistingClaudeLogin` plus usable profile authorization. No publisher identity or credentials are bundled. Local Ollama/Qwen still requires no account/key. Enabled AI tools resolve official latest-stable metadata; CLI candidates and archive integrity are checked before use. Application/model pins remain fixed.
+
+Verification on 2026-10-10:
+
+- All 20 offline installer checks passed, including signed-out/existing/switched/signup/failed login branches, unattended refusal, inherited-token exclusion/restoration, stable-version discovery and invalid URL/digest rejection. Provider login branches use synthetic stubs; no new account was created by these tests.
+- A real clean Claude 2.1.295 installation updated to 2.1.296, verified native version/required worker flags, retained its rollback copy, reused the current version, and remained unsigned-in in an isolated profile. Reuse-login authorization did not bypass missing credentials. No paid job or real account login ran in this test. The same check is included in GitHub Windows CI.
+- Ollama 0.40.2 downloaded from its official release, passed its SHA256 and complete model checks, and returned the actual structured local readiness response in 4.3 seconds.
+
+- Full selected-feature setup passed: 130 automated app tests (3 opt-in model tests skipped), lint/types/build/private trace checks/audit, zero vulnerabilities, authenticated readiness, and live service/app/direct PDF smoke. All 6 isolated browser checks passed.
+- A real Claude review job read the committed 0.4.1 package through the HTTP service, returned the correct version, and recorded the actual Read tool event. It did not edit the active source or financial ledger.
+- A separate clean 0.4.1 source ZIP in a folder with spaces installed with `-NonInteractive -NoAI -SkipAgent -NoBrowser`, created its own Git baseline and private state, passed the full application gate, started finance/scheduling and parsed a real direct PDF. No account/configuration/personal data or installed dependencies were copied. Only the public Node/Git archive caches were reused and their SHA256 verified before fresh extraction. This was another installation on the verification laptop, not another physical laptop.
+- All 12 retained process-ownership/checksum installer checks passed. The published Git history scan reported no leaked credentials; private stores/config/runtime paths remain excluded.
+
+Account creation, subscriptions, quotas and optional provider consents remain the destination user's actions. [GitHub Windows CI](https://github.com/i-xzvr/expense-tracker-ai/actions/workflows/verify.yml) repeats app/browser, onboarding and real signed-out CLI installation/update checks on published changes. The 0.4.0 hosted/source-install results below are historical, not claims of a new physical-machine test for 0.4.1.
+
+## 0.4.0 retained historical acceptance
 
 Verified on 2026-10-10. A repository upload alone does not prove installation works. The following evidence was collected:
 

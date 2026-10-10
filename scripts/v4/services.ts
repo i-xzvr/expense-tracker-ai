@@ -38,6 +38,7 @@ async function execute(job:CodingJob){
   const childEnvironment:NodeJS.ProcessEnv={NODE_ENV:"production"};
   for(const key of ["PATH","Path","USERPROFILE","APPDATA","LOCALAPPDATA","TEMP","TMP","SystemRoot","SYSTEMROOT","WINDIR","COMSPEC","HOME","HOMEDRIVE","HOMEPATH","PROGRAMFILES","ProgramFiles","PROGRAMFILES(X86)","ProgramFiles(x86)","ProgramW6432","USERNAME"]){if(process.env[key])childEnvironment[key]=process.env[key];}
   if(process.env.CLAUDE_CODE_GIT_BASH_PATH)childEnvironment.CLAUDE_CODE_GIT_BASH_PATH=process.env.CLAUDE_CODE_GIT_BASH_PATH;
+  if(process.env.CLAUDE_CONFIG_DIR)childEnvironment.CLAUDE_CONFIG_DIR=process.env.CLAUDE_CONFIG_DIR;
   childEnvironment.DISABLE_AUTOUPDATER="1";
   childEnvironment.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1";
   const child=spawn(binary,args,{cwd:workspace,windowsHide:true,stdio:["ignore","pipe","pipe"],env:childEnvironment});

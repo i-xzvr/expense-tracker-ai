@@ -34,14 +34,16 @@ The interactive script:
 
 1. Checks Windows x64/build, PowerShell version, RAM/free disk, running processes, setup lock and ports; requires at least 3 GB free and backs up existing configuration under ignored `.runtime/config-backups`.
 2. Offers local Ollama AI with 4B or smaller 2B model, and optional Claude coding jobs. Selecting no Claude does not disable finance or scheduling.
-3. Downloads pinned Node/npm and Portable Git, verifies configured SHA256 checksums, and installs exact Claude packages from a separate integrity-locked npm lockfile if selected. All tools remain in `.runtime`; no permanent PATH/registry changes are made.
-4. Checks Claude's version and account login. If necessary, invokes Claude's own browser sign-in. Claude manages that login in the destination user's own profile; it is not copied by this repository. Enter account credentials only on the provider's sign-in page. No account token/password belongs in V4's setup prompts.
+3. Detects existing Claude/Ollama commands, then installs or updates **V4's managed copies**. It checks Claude's official npm `latest` and Ollama's official stable GitHub release metadata whenever those features are enabled. Node/npm, Git, app dependencies and Qwen model digests stay release-pinned. Ollama archives require the official SHA256; npm verifies Claude package integrity. New Claude versions are staged and checked for the worker's required CLI flags before replacing the old binary. Tools remain in `.runtime`; global apps and permanent PATH/registry settings are unchanged.
+4. Explains account requirements and always asks the destination user to choose **use my existing login**, **sign in/change account**, **create an account, then sign in**, or **skip coding jobs**. An existing login is never silently assumed to be the intended account. Signup opens the provider website; the user creates their own account and arranges eligible access, then completes Claude's own browser login. The installer verifies profile sign-in before enabling jobs. Claude manages credentials in the current Windows user's profile (or the user's `CLAUDE_CONFIG_DIR`); no publisher identity, account password or token is copied from GitHub. Inherited API keys/tokens are excluded from installer Claude invocations, matching the job worker. Sign-in/change-account can replace the current profile's Claude login; it is an explicit user choice.
 5. Offers existing OneDrive folder, Microsoft public-client ID/tenant, and Google OAuth credentials. Google secret/refresh-token entry is masked. Optional configuration is stored locally in ignored `.env.local`; existing values are preserved unless you select an update. Plaintext Google credentials and configuration backups require normal device access protection. Inputs must be single-line and cannot contain a single quote.
 6. Initializes a source-only local Git baseline if the download was a ZIP. This makes committed-HEAD worktrees possible without a GitHub account; it does not upload anything. Existing repositories must have a committed HEAD. Keep private files under ignored folders; inspect source before allowing coding jobs.
 7. Installs the exact app lockfile, downloads/verifies Ollama/model blobs if selected, performs an actual local structured-response smoke test, and runs lint, types, automated tests, production build, private-file trace checks and dependency audit. Any failure returns a nonzero exit code; no successful-install claim is made.
 8. Checks V4 readiness, starts app/services, verifies live endpoints and a synthetic direct PDF, and opens the browser. Completion is recorded in `.runtime/state/installation.json` without credentials. First setup can take several minutes. Model inference on a CPU may take longer; the model smoke test has a ten-minute timeout.
 
-Defaults are local 4B AI and Claude enabled. If you do not have Claude access, answer **n** at its prompt, or use `-SkipAgent`. You can rerun later to add it. Eligible accounts and login behavior are documented by [Anthropic](https://code.claude.com/docs/en/setup).
+Defaults are local 4B AI and Claude enabled. **Local Ollama/Qwen needs no account, subscription or API key.** Claude jobs need the user's own eligible Pro/Max/Team/Enterprise or Claude Console access; a free Claude chat account alone is insufficient. Usage limits/billing can apply. If you do not have access, choose skip; finance, PDF, scheduling and selected local AI remain available. You can rerun later to add Claude. V4 never creates an account or buys a plan. Eligible access and profile credential storage are documented by [Anthropic setup](https://code.claude.com/docs/en/setup) and [authentication](https://code.claude.com/docs/en/authentication).
+
+The normal provider profile is outside the app source in the destination Windows user's home. If you intentionally use `CLAUDE_CONFIG_DIR` for a separate account, choose an **absolute path outside the source folder or under ignored `.runtime`**, and use the same environment for setup, Claude-V4 and Start-V4. Do not put a credential profile in a publishable source directory or use a relative profile path that resolves differently in agent worktrees.
 
 ### Repeatable command-line modes
 
@@ -53,13 +55,13 @@ Defaults are local 4B AI and Claude enabled. If you do not have Claude access, a
 .\Setup-V4.cmd -NonInteractive -Model qwen3.5:2b -SkipAgent
 
 # Full AI and coding setup, using an already authenticated Claude profile:
-.\Setup-V4.cmd -NonInteractive -NoBrowser
+.\Setup-V4.cmd -NonInteractive -UseExistingClaudeLogin -NoBrowser
 
 # Install/check but do not start the application:
 .\Setup-V4.cmd -NonInteractive -NoAI -SkipAgent -NoStart
 ```
 
-Flags: `-Model` selects 4B/2B; `-NoAI` omits model/Ollama installation and persists finance-only mode; `-SkipAgent` persists disabled coding jobs; `-NonInteractive` suppresses choices/provider prompts and requires an existing login when Claude is selected; `-NoStart` omits live startup/smoke; `-NoBrowser` leaves successful services running without opening a tab. Interactive reruns can re-enable previously skipped features. Existing `.env.local` configuration can be used in noninteractive mode; [.env.example](../.env.example) lists supported fields.
+Flags: `-Model` selects 4B/2B; `-NoAI` omits model/Ollama installation and persists finance-only mode; `-SkipAgent` persists disabled coding jobs; `-NonInteractive` suppresses choices/provider prompts; selecting Claude then requires **both** a usable destination-user profile login and **`-UseExistingClaudeLogin`**, which explicitly authorizes that account. `-NoStart` omits live startup/smoke; `-NoBrowser` suppresses V4's app/signup tabs (Claude's provider login can still open its browser). `-UseBundledAITools` explicitly skips online AI version discovery and installs the source release's tested baseline; it does not mean tools are latest and is useful for upstream outages or incompatible future CLI changes. Package/archive installation still needs internet or verified caches. Interactive reruns can re-enable skipped features. Existing `.env.local` configuration can be used in noninteractive mode; [.env.example](../.env.example) lists supported fields.
 
 ## 4. Start, verify and stop
 
@@ -88,6 +90,13 @@ Optional live Claude acceptance (uses normal account usage and retains a review 
 
 This requires a real Read tool result from the isolated source worktree; it never edits the active project or accesses financial records.
 
+Optional installer/tool checks (the second downloads Claude and uses an isolated signed-out profile, without a live inference job):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-V4Installer.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-V4ClaudeInstall.ps1
+```
+
 ## 5. Optional connections
 
 - **OneDrive desktop folder:** sign in to the Microsoft OneDrive app on the new machine first. V4 detects `OneDriveConsumer`/`OneDrive`, or use the wizard's absolute folder override. Select and confirm a synthetic export. Verify the file under `Expense Tracker V4/Reports` and the desktop client's sync status. V4's `queued-for-sync` proves local bytes, not cloud arrival.
@@ -107,9 +116,11 @@ Alternative for server-only stores: stop V4 on both machines and copy the `data`
 
 ## 7. Updates and rollback
 
-Setup installs/repairs **the versions pinned by this source release**, including application dependencies and tool binaries. It does not upgrade Windows, drivers or unrelated global programs and does not blindly install newest packages. For an update: make a combined backup, stop V4, retain the old source folder/config, and obtain the new tagged source. For a clean clone use `git pull --ff-only`; if it refuses due to local edits, retain/review them instead of forcing/resetting. Run Setup-V4 again with the same chosen features, then Start-V4 and verify data. Each `.env.local` change/settings update has a configuration backup in `.runtime/config-backups`.
+Setup installs/repairs release-pinned application dependencies/Node/Git/models, and **checks/updates enabled managed Claude and Ollama to their latest stable versions by default**. If already current, Claude is reused and verified Ollama archives/extractions are reused. Resolved versions, channel and check timestamp are recorded in private `.runtime/ai-tools.json` and `.runtime/state/installation.json`. Start/readiness use those recorded versions; no background updater changes them during jobs. A successful full setup includes actual model inference, app tests and PDF smoke. CLI flag checks cannot guarantee every future provider behavior; use a live review job after upgrading. If official discovery fails, setup stops with retry/bundled instructions rather than claiming latest status. Models stay at the verified V4 digests for reproducibility; upgrading model families/weights requires a reviewed source release.
 
-To roll back: stop the new copy, restart the retained compatible source/build, and restore backed-up settings if needed. Do not overwrite a current database blindly; retain both copies and use validated exports/imports. Backups omit executable dependencies and must be paired with a retained source release. Installer pins should be updated together with official checksums, both npm lockfiles and actual fresh-install tests; Claude's project-local auto-updater is disabled to preserve tested flags.
+It does not upgrade Windows, drivers, unrelated global programs or the app framework automatically. For a source update: make a combined backup, stop V4, retain the old source folder/config, and obtain the new tagged source. For a clean clone use `git pull --ff-only`; if it refuses due to local edits, retain/review them instead of forcing/resetting. Rerun Setup-V4 with the same features and confirm your account, then verify data. Existing `.env.local`/settings/AI tool metadata receive backups in `.runtime/config-backups`; replaced Claude installations are retained in `.runtime/tool-backups` and versioned Ollama directories are retained.
+
+To roll back tools using the tested source baseline: stop V4 and rerun `Setup-V4.cmd -UseBundledAITools`, choose the same features and confirm your account. Alternatively retain the previous compatible source/build, matching tool directory and `ai-tools.json`/settings backup as a set. Failed staged Claude candidates remain under ignored `.runtime/claude-candidate-*` for diagnosis; the prior binary remains until the new binary passes version/flag checks. Do not overwrite a current database blindly; retain both copies and use validated exports/imports. Backups omit executable dependencies and must be paired with retained source. Release baseline pins should be updated with official checksums, lockfiles and actual install tests.
 
 A fully offline copy requires a trusted already-built installation including runtimes/models, `node_modules`, `.next`, source and Git HEAD. Exclude personal data unless explicitly transferring it, `.env.local`, DPAPI vault, machine state/logs/tmp/Ollama profile, tokens and agent worktrees. Regenerate machine-specific state and authenticate Claude locally. Offline finance works; offline Claude/Graph/Sheets do not. Rerunning npm setup requires internet even if model archives are cached.
 
@@ -123,7 +134,9 @@ A fully offline copy requires a trusted already-built installation including run
 | Download/hash failure | Check internet/proxy and trusted source release. A corrupted cached archive must be moved aside so it can redownload; never bypass the hash check. |
 | `npm ci`, check or audit fails | Inspect reported dependency/check error. Setup remains incomplete. Use an updated reviewed source release; do not suppress audit failures. |
 | AI smoke timeout or memory error | Stop V4, rerun with `-Model qwen3.5:2b`, or `-NoAI`. Check hardware/vendor drivers separately. |
-| Claude unavailable / login required | Rerun interactive setup or pinned CLI login; verify eligibility/quota with provider. Start again after login. |
+| Claude account confirmation required | Rerun interactive setup and choose your account. For unattended setup explicitly add `-UseExistingClaudeLogin` only after signing in with your own profile, or use `-SkipAgent`. |
+| AI update discovery / future CLI incompatibility | Retry official network access; use `-UseBundledAITools` for the tested baseline if necessary. This skips latest checking, not package integrity or app/model checks. |
+| Claude unavailable / login required | Rerun interactive setup or managed CLI login; verify eligibility/quota with provider. Start again after login. |
 | OneDrive configured but no remote file | Check desktop sign-in, sync paused/offline, quota and sync indicators. Local queue status is not remote confirmation. |
 | Sheets 401/403 or partial delivery | Refresh consent/credentials/API enablement and edit access; inspect newly created worksheet before retrying. |
 | Empty ledger in another browser | Financial IndexedDB is browser-profile/origin specific. Restore combined backup into the intended profile. |

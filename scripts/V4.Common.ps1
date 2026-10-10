@@ -19,9 +19,18 @@ function Get-V4Settings {
     return [PSCustomObject]@{ agentEnabled = $false }
 }
 function Get-V4ClaudeAuth([string]$Executable) {
-    $raw = & $Executable auth status 2>$null
-    if ($LASTEXITCODE -ne 0) { return $false }
+    $raw = Invoke-V4Claude $Executable @('auth','status') 2>$null
+    if ($script:V4ClaudeExitCode -ne 0) { return $false }
     try { return [bool](($raw -join "`n" | ConvertFrom-Json).loggedIn) } catch { return $false }
+}
+function Get-V4ClaudeVersion {
+    $path = Join-Path $script:V3Runtime 'ai-tools.json'
+    if (Test-Path -LiteralPath $path) {
+        $version = (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).claudeVersion
+        if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid managed Claude version.' }
+        return $version
+    }
+    return $script:V4Tools.claudeVersion
 }
 function Backup-V4Config([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return }
@@ -44,3 +53,4 @@ function Read-V4Secret([string]$Prompt) {
     try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
     finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer); $secure.Dispose() }
 }
+. (Join-Path $PSScriptRoot 'V4.AI.ps1')

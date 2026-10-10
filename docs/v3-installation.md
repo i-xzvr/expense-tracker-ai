@@ -46,7 +46,7 @@ The execution-policy override is limited to this invocation. There is no permane
 
 ## Versions and repeatability
 
-`config/local-ai.json` pins the runtime download URLs, archive hashes, model names, and model manifest hashes. The default configuration is Node **24.19.0**, Ollama **0.40.0**, and **Qwen3.5 4B**; **Qwen3.5 2B** is the optional fallback. The package lock pins application dependencies. Setup reuses verified archives and resumes incomplete downloads. It never runs `npm audit fix --force`, upgrades versions automatically, or silently accepts a different model behind the same tag.
+`config/local-ai.json` pins the runtime download URLs, archive hashes, model names, and model manifest hashes. The current baseline is Node **24.19.0**, Ollama **0.40.2**, and **Qwen3.5 4B**; **Qwen3.5 2B** is the optional fallback. The package lock pins application dependencies. Setup reuses verified archives and resumes incomplete downloads. V3 setup does not discover new releases; V4 setup can resolve newer official AI tools and writes private `.runtime/ai-tools.json`, which shared launchers honor. See [V4 update behavior](v4-installation.md#7-updates-and-rollback). Neither installer silently accepts different model weights behind the same tag.
 
 Ollama verifies blobs during a model pull; setup also verifies the pinned manifest and every local blob afterward. If the upstream model tag changes, setup intentionally stops at a digest mismatch. Use an existing verified runtime/model cache or a reviewed release of this app with updated pins. Do not bypass a hash mismatch. These pins provide reproducibility, not indefinite security support; periodically update the runtime and dependencies in a reviewed application release and rerun tests.
 

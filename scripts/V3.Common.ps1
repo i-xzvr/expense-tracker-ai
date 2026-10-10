@@ -4,6 +4,17 @@ $ErrorActionPreference = 'Stop'
 $script:V3Root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $script:V3Runtime = Join-Path $script:V3Root '.runtime'
 $script:V3Config = Get-Content -LiteralPath (Join-Path $script:V3Root 'config/local-ai.json') -Raw | ConvertFrom-Json
+# V4 can resolve a newer official Ollama release during setup. Start/stop and V3
+# model verification must use the same recorded managed runtime, never global AI.
+$aiToolsPath = Join-Path $script:V3Runtime 'ai-tools.json'
+if (Test-Path -LiteralPath $aiToolsPath) {
+    $managedAI = Get-Content -LiteralPath $aiToolsPath -Raw | ConvertFrom-Json
+    $tool = $managedAI.ollama
+    if ($tool.version -notmatch '^\d+\.\d+\.\d+$' -or $tool.directory -ne "ollama-$($tool.version)" -or
+        $tool.url -ne "https://github.com/ollama/ollama/releases/download/v$($tool.version)/ollama-windows-amd64.zip" -or
+        $tool.sha256 -notmatch '^[a-f0-9]{64}$' -or $tool.baseUrl -ne 'http://127.0.0.1:11435') { throw 'Invalid managed Ollama configuration. Restore a .runtime/config-backups copy or rerun setup with the invalid ai-tools.json moved aside.' }
+    $script:V3Config.ollama = $tool
+}
 
 # Get-FileHash is a module-exported function that may not be discoverable when
 # Windows PowerShell inherits another shell's module paths. Hash through .NET

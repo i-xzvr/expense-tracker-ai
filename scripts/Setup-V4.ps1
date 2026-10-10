@@ -2,7 +2,8 @@
 param(
     [ValidateSet('qwen3.5:4b','qwen3.5:2b')][string]$Model = 'qwen3.5:4b',
     [switch]$NoAI, [switch]$SkipAgent, [switch]$NonInteractive,
-    [switch]$NoStart, [switch]$NoBrowser
+    [switch]$NoStart, [switch]$NoBrowser,
+    [switch]$UseExistingClaudeLogin, [switch]$UseBundledAITools
 )
 . (Join-Path $PSScriptRoot 'V4.Common.ps1')
 $lock = $null
@@ -26,14 +27,21 @@ try {
         if (Test-V3Port $port) { throw "Port $port is occupied. Stop the other application/copy before installing. No process was stopped." }
     }
     if (-not $NonInteractive) {
-        Write-Host 'V4 local setup. Downloads are pinned and verified; no administrator account or global PATH changes are needed.'
+        Write-Host 'V4 local setup uses managed, verified tools. Enabled AI tools are checked for stable updates; no administrator account or global PATH changes are needed.'
+        Write-Host 'Local Ollama/Qwen needs no account. Claude coding jobs need your own eligible account and explicit sign-in confirmation.'
         if (-not $NoAI) { $NoAI = (Read-Host 'Install local Ollama AI (several GB)? [Y/n]') -match '^(n|no)$' }
         if (-not $NoAI) {
             if ((Read-Host 'Use the smaller 2B model instead of 4B? [y/N]') -match '^(y|yes)$') { $Model = 'qwen3.5:2b' }
         }
         if (-not $SkipAgent) { $SkipAgent = (Read-Host 'Install Claude coding jobs (requires your Claude Code account)? [Y/n]') -match '^(n|no)$' }
     }
-    foreach ($config in @('settings.json','v4-settings.json','state/installation.json')) { Backup-V4Config (Join-Path $script:V3Runtime $config) }
+    foreach ($config in @('settings.json','v4-settings.json','ai-tools.json','state/installation.json')) { Backup-V4Config (Join-Path $script:V3Runtime $config) }
+    foreach ($name in @('claude','ollama')) {
+        $installed = Get-Command $name -ErrorAction SilentlyContinue
+        if ($installed) { Write-Host "An existing $name command was detected. V4 checks/updates its own managed copy and leaves global installations intact." }
+    }
+    try { $aiPlan = Get-V4AIToolPlan (-not [bool]$NoAI) (-not [bool]$SkipAgent) ([bool]$UseBundledAITools) }
+    catch { throw "AI update checking failed: $($_.Exception.Message) Retry when official services are reachable, or explicitly select -UseBundledAITools for the release baseline (latest status unknown)." }
     # Bootstrap only Node before npm/Git setup. V3 owns checksum/model installation.
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Setup-V3.ps1') -RuntimeOnly -NoAI -Model $Model
     if ($LASTEXITCODE -ne 0) { throw 'Portable Node bootstrap failed.' }
@@ -60,23 +68,11 @@ try {
     $env:CLAUDE_CODE_GIT_BASH_PATH = Join-Path $gitDirectory 'bin/bash.exe'
     $env:DISABLE_AUTOUPDATER = '1'
     if (-not $SkipAgent) {
-        $agentRoot = Join-Path $script:V3Runtime 'claude'
-        New-Item -ItemType Directory -Force -Path $agentRoot | Out-Null
-        Copy-Item -LiteralPath (Join-Path $script:V3Root 'config/claude-runtime/package.json') -Destination $agentRoot
-        Copy-Item -LiteralPath (Join-Path $script:V3Root 'config/claude-runtime/package-lock.json') -Destination $agentRoot
-        & $node $npm ci --prefix $agentRoot --no-fund
-        if ($LASTEXITCODE -ne 0) { throw 'Pinned Claude installation failed.' }
-        $native = Get-V4Claude
-        if (-not $native) { throw 'Claude native executable is missing after installation.' }
-        $version = & $native --version
-        if ($LASTEXITCODE -ne 0 -or $version -notlike "$($script:V4Tools.claudeVersion) *") { throw 'Claude version does not match the pinned release.' }
-        if (-not (Get-V4ClaudeAuth $native)) {
-            if ($NonInteractive) { throw 'Claude login is required. Rerun interactive Setup-V4.cmd, or select -SkipAgent for a working finance-only installation.' }
-            Write-Host 'Complete your own Claude sign-in in the browser. Passwords and account tokens are never requested by V4.'
-            & $native auth login
-            if ($LASTEXITCODE -ne 0 -or -not (Get-V4ClaudeAuth $native)) { throw 'Claude sign-in did not complete. Rerun setup or choose -SkipAgent.' }
-        }
+        $native = Install-V4Claude $node $npm $aiPlan.claudeVersion
+        $SkipAgent = -not (Connect-V4Claude $native ([bool]$NonInteractive) ([bool]$UseExistingClaudeLogin) ([bool]$NoBrowser))
     }
+    $aiPlan | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $script:V3Runtime 'ai-tools.json') -Encoding UTF8
+    $script:V3Config.ollama = $aiPlan.ollama
     if (-not $NonInteractive) {
         if ((Read-Host 'Configure an installed OneDrive folder override? [y/N]') -match '^(y|yes)$') {
             $syncRoot = Read-Host 'Existing signed-in OneDrive sync folder (absolute path)'
@@ -126,7 +122,7 @@ try {
         & $node (Join-Path $PSScriptRoot 'smoke-v4.mjs')
         if ($LASTEXITCODE -ne 0) { throw 'Live V4/PDF acceptance failed.' }
     }
-    @{completedAt=[DateTime]::UtcNow.ToString('o');version='0.4.0';checksPassed=$true;started=(-not [bool]$NoStart);localAI=(-not [bool]$NoAI);agent=(-not [bool]$SkipAgent)} |
+    @{completedAt=[DateTime]::UtcNow.ToString('o');version=(Get-Content -LiteralPath (Join-Path $script:V3Root 'package.json') -Raw | ConvertFrom-Json).version;checksPassed=$true;started=(-not [bool]$NoStart);localAI=(-not [bool]$NoAI);agent=(-not [bool]$SkipAgent);aiToolChannel=$aiPlan.channel;aiToolsCheckedAt=$aiPlan.checkedAt;claudeVersion=$aiPlan.claudeVersion;ollamaVersion=$aiPlan.ollama.version} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $script:V3Runtime 'state/installation.json') -Encoding UTF8
     Write-Host 'V4 installation and checks passed. Start-V4.cmd opens the app; Stop-V4.cmd stops this copy. See docs/v4-installation.md.'
     if (-not $NoStart -and -not $NoBrowser) { Start-Process $script:V3Config.appUrl }

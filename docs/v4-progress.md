@@ -12,6 +12,8 @@ Sequence completed: platform/Claude repair and V3 backup; API/export foundation;
 
 Windows 11 x64 verification host. Pinned Node 24.19.0/npm 11.17.0, Git/Git Bash and Claude 2.1.296 verified. Existing account authentication and a tool-free live request succeeded. App startup, Ollama/model readiness and service health were verified. The release installer now supplies portable Git 2.56.0.windows.2 and project-local Claude. No elevation or operating-system security changes were needed.
 
+V4 0.4.1 adds destination-user Claude account confirmation/login/signup/skip and official stable update checks for managed Claude/Ollama. Ollama 0.40.2 is the new tested baseline. App/model pins stay fixed; global AI installations and account credentials are not copied or silently replaced. See [installation](v4-installation.md) and [release verification](v4-release-verification.md) for new-user tests, unattended flags and rollback.
+
 Pre-upgrade server data/configuration were backed up locally; those private backups are excluded from this repository. Browser IndexedDB is separate and was not included in the server backup. V4 retains the same browser origin, so existing financial records remain accessible. For another-machine transfer and rollback, use the [V4 installation guide](v4-installation.md) and a verified combined backup.
 
 ## Course coverage
