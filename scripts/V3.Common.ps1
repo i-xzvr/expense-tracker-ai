@@ -31,6 +31,9 @@ function Assert-V3Windows {
     if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') {
         throw 'This package pins Windows x64 binaries; Windows ARM64 is not supported by this installer.'
     }
+    if ($PSVersionTable.PSVersion -lt [version]'5.1' -or [Environment]::OSVersion.Version.Build -lt 19045) {
+        throw 'Setup requires PowerShell 5.1+ and Windows 10 22H2 (build 19045) or newer.'
+    }
 }
 
 function Assert-V3Hash([string]$Path, [string]$Expected) {

@@ -12,6 +12,12 @@ $previousUpdates = [Environment]::GetEnvironmentVariable('DISABLE_AUTOUPDATER','
 try {
     Assert-V3Windows
     Initialize-V3Folders
+    $hardware = Get-CimInstance Win32_ComputerSystem
+    $ramGB = [Math]::Round($hardware.TotalPhysicalMemory / 1GB,1)
+    $drive = New-Object IO.DriveInfo([IO.Path]::GetPathRoot($script:V3Root))
+    $freeGB = [Math]::Round($drive.AvailableFreeSpace / 1GB,1)
+    Write-Host "Prerequisites: Windows x64, PowerShell $($PSVersionTable.PSVersion), $ramGB GB RAM, $freeGB GB free on installation drive."
+    if ($drive.AvailableFreeSpace -lt 3GB) { throw 'At least 3 GB free disk is required for setup/dependencies; see docs/v4-installation.md for local-AI space planning.' }
     $lock = [IO.File]::Open((Join-Path $script:V3Runtime 'v4-setup.lock'),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
     foreach ($name in @('app','ollama','v4-services')) {
         if (Test-V3ProcessIdentity (Get-V3ProcessRecord $name)) { throw 'This copy is running. Run Stop-V4.cmd before setup or updates.' }

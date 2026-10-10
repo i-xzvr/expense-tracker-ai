@@ -32,10 +32,10 @@ Double-click **Setup-V4.cmd**, or run it from PowerShell. For useful persistent 
 
 The interactive script:
 
-1. Checks Windows x64, running processes, setup lock and ports; backs up existing configuration under ignored `.runtime/config-backups`.
+1. Checks Windows x64/build, PowerShell version, RAM/free disk, running processes, setup lock and ports; requires at least 3 GB free and backs up existing configuration under ignored `.runtime/config-backups`.
 2. Offers local Ollama AI with 4B or smaller 2B model, and optional Claude coding jobs. Selecting no Claude does not disable finance or scheduling.
 3. Downloads pinned Node/npm and Portable Git, verifies configured SHA256 checksums, and installs exact Claude packages from a separate integrity-locked npm lockfile if selected. All tools remain in `.runtime`; no permanent PATH/registry changes are made.
-4. Checks Claude's version and account login. If necessary, invokes Claude's own browser sign-in. Enter account credentials only on the provider's sign-in page. No account token/password belongs in V4's setup prompts.
+4. Checks Claude's version and account login. If necessary, invokes Claude's own browser sign-in. Claude manages that login in the destination user's own profile; it is not copied by this repository. Enter account credentials only on the provider's sign-in page. No account token/password belongs in V4's setup prompts.
 5. Offers existing OneDrive folder, Microsoft public-client ID/tenant, and Google OAuth credentials. Google secret/refresh-token entry is masked. Optional configuration is stored locally in ignored `.env.local`; existing values are preserved unless you select an update. Plaintext Google credentials and configuration backups require normal device access protection. Inputs must be single-line and cannot contain a single quote.
 6. Initializes a source-only local Git baseline if the download was a ZIP. This makes committed-HEAD worktrees possible without a GitHub account; it does not upload anything. Existing repositories must have a committed HEAD. Keep private files under ignored folders; inspect source before allowing coding jobs.
 7. Installs the exact app lockfile, downloads/verifies Ollama/model blobs if selected, performs an actual local structured-response smoke test, and runs lint, types, automated tests, production build, private-file trace checks and dependency audit. Any failure returns a nonzero exit code; no successful-install claim is made.

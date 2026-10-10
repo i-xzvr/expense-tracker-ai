@@ -16,6 +16,8 @@ Weekly local and OneDrive backup schedules copy a captured, validated combined s
 
 Register a Microsoft public-client application for the intended account type, enable public-client/device authorization, and authorize delegated Files.ReadWrite plus offline_access. Put the public application ID in V4_MS_CLIENT_ID. V4_MS_TENANT defaults to consumers for personal accounts; use an appropriate tenant ID/common setting for work accounts.
 
+In your own Entra tenant: **Entra ID → App registrations → New registration**, select the intended supported account types, and copy **Application (client) ID**. For personal OneDrive choose a registration supporting personal accounts and tenant `consumers`. Enable public-client flows under the app's Authentication settings, add Microsoft Graph delegated `Files.ReadWrite`, and follow any required user/admin consent policy. No client secret or web callback URL is used by this device flow. Registration requires the relevant account/tenant permissions; the installed sync-folder adapter avoids this prerequisite. [Microsoft registration guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app).
+
 Use Integrations -> Connect OneDrive, complete Microsoft's sign-in yourself, then Check sign-in. Access/refresh tokens are protected by Windows DPAPI and stored in ignored data/v4-cloud.dpapi; they are usable only under that Windows user's context. Combined backups exclude them. Copying this file to another machine does not transfer authorization.
 
 Create the destination folder in OneDrive first (default: Expense Exports). Delivery uses Microsoft Graph's content upload API and requires a returned file ID. Uploads are not publicly shared. Each attempt adds a unique suffix to the chosen filename, preserving earlier exports. An interrupted response remains unconfirmed; inspect the destination before retrying.
@@ -25,6 +27,16 @@ Primary sources: [device authorization](https://learn.microsoft.com/en-us/entra/
 ## Google Sheets
 
 Use your own Google OAuth application with spreadsheet write access. Server configuration supports V4_GOOGLE_ACCESS_TOKEN (short-lived), or V4_GOOGLE_CLIENT_ID, V4_GOOGLE_CLIENT_SECRET and V4_GOOGLE_REFRESH_TOKEN together. Keep secrets only in .env.local. This release has no Google sign-in UI.
+
+One manual setup route is Google's own [OAuth Playground](https://developers.google.com/oauthplayground/):
+
+1. In your Google Cloud project enable **Google Sheets API**, configure the OAuth consent screen/audience, and add your account as a test user if the application is in testing.
+2. Create a **Web application** OAuth client and add `https://developers.google.com/oauthplayground` as its authorized redirect URI.
+3. In Playground's settings choose Google endpoints, server-side flow, offline access, and **Use your own OAuth credentials**; enter your client ID/secret there. These credentials are provided to Google's own tool, not this repository.
+4. Authorize `https://www.googleapis.com/auth/spreadsheets` with the intended account, exchange the authorization code, and retain the returned refresh token locally. The Playground's shared-client refresh tokens are revoked after 24 hours; using your own client avoids that Playground limit. Your own consent/token policies can still require reauthorization.
+5. Enter the three values through Setup-V4's masked secret prompts or ignored `.env.local`, restart V4, and test a synthetic export to a spreadsheet that account can edit. Do not share Playground links containing credentials/tokens.
+
+The spreadsheet ID is the part between `/d/` and `/edit` in its URL. Credentials stay on your own machine and must be reacquired/configured after moving to another computer.
 
 Select a spreadsheet you can edit. Enter its ID, preview the selected rows and confirm delivery. A new worksheet is created for each attempt; values are RAW, so formula-looking descriptions remain text. A failure after worksheet creation is reported as partial delivery and may leave an empty worksheet. Review before retrying. Sheets exports detail cells rather than uploading a PDF file.
 

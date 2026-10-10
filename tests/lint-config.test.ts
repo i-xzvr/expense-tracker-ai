@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { test } from "node:test";
 import { ESLint } from "eslint";
 import eslintConfig from "../eslint.config.mjs";
 
 test("Next lint discovers pages through a root-directory glob and enforces Link navigation", async (t) => {
-  const tempRoot = resolve(tmpdir());
+  // Match a real installation/monorepo layout on its own volume. Windows CI
+  // checks out on D: while OS TEMP is C:, and the scoped glob adapter returns
+  // paths relative to the process cwd. Keep this synthetic fixture in ignored
+  // work/ so cross-volume temporary paths cannot invalidate directory lookup.
+  const tempRoot = resolve("work/lint-fixtures");
+  await mkdir(tempRoot, { recursive: true });
   const fixtureRoot = await mkdtemp(join(tempRoot, "expense-tracker-lint-"));
   t.after(async () => {
     // Only remove this test's direct, uniquely named temporary directory.
