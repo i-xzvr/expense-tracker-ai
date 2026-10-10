@@ -36,10 +36,16 @@ try {
     $archive = Join-Path $script:V3Runtime 'downloads/PortableGit-2.56.0.2-64-bit.7z.exe'
     Get-V3VerifiedDownload $script:V4Tools.git.url $archive $script:V4Tools.git.sha256
     $gitDirectory = Join-Path $script:V3Runtime $script:V4Tools.git.directory
-    if (-not (Test-Path -LiteralPath (Join-Path $gitDirectory 'cmd/git.exe'))) {
-        # Upstream SFX switches suppress extraction dialogs and set a literal path.
-        $extract = Start-Process -FilePath $archive -ArgumentList @('-y','-gm2',('-InstallPath="' + $gitDirectory.Replace('\','\\') + '"')) -WindowStyle Hidden -PassThru -Wait
+    $gitMarker = Join-Path $gitDirectory '.archive-sha256'
+    if (-not (Test-Path -LiteralPath (Join-Path $gitDirectory 'cmd/git.exe')) -or -not (Test-Path -LiteralPath $gitMarker)) {
+        Write-Host 'Extracting portable Git (many small files; allow several minutes)...'
+        # This release supports -o. Older documented -InstallPath switches are
+        # ignored by its SFX, so verify the actual destination before accepting.
+        $extract = Start-Process -FilePath $archive -ArgumentList @('-y',('-o"' + $gitDirectory + '"')) -WindowStyle Hidden -PassThru
+        if (-not $extract.WaitForExit(600000)) { $extract.Kill(); throw 'Portable Git extraction timed out after ten minutes.' }
         if ($extract.ExitCode -ne 0) { throw 'Portable Git extraction failed.' }
+        if (-not (Test-Path -LiteralPath (Join-Path $gitDirectory 'cmd/git.exe')) -or -not (Test-Path -LiteralPath (Join-Path $gitDirectory 'bin/bash.exe'))) { throw 'Portable Git did not extract into the required destination.' }
+        [IO.File]::WriteAllText($gitMarker,$script:V4Tools.git.sha256)
     }
     $git = Get-V4Git
     $gitVersion = & $git --version
