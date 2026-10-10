@@ -39,13 +39,13 @@ export async function v4Route(request: Request, segments: string[]): Promise<Res
       return json(await saveToSyncFolder(new TextEncoder().encode(JSON.stringify(backup)),"expense-tracker-v4-complete.json","Backups"));
     }
     if (path === "backup-schedules") {
-      if (!isObject(body) || body.confirmed !== true || ![24,168,720].includes(Number(body.intervalHours))) throw new V4Error(400,"CONFIRM_REQUIRED","Confirm this captured local backup schedule.");
+      if (!isObject(body) || body.confirmed !== true || ![24,168,720].includes(Number(body.intervalHours)) || (body.destination !== undefined && !["local-backup","onedrive-sync"].includes(String(body.destination)))) throw new V4Error(400,"CONFIRM_REQUIRED","Confirm this captured backup schedule and its local or OneDrive destination.");
       let backup;
       try { backup = parsePortableBackup(JSON.stringify(body.backup)); } catch { throw new V4Error(400,"INVALID_BACKUP","The combined backup is invalid."); }
       const id = randomUUID();
       const folder = join(process.cwd(),"data","v4-backup-snapshots");
       await mkdir(folder,{recursive:true});await writeFile(join(folder,id+".json"),JSON.stringify(backup),{mode:0o600});
-      db.saveSchedule({id,name:"Local combined backup",enabled:true,intervalHours:Number(body.intervalHours),nextAt:Date.now()+Number(body.intervalHours)*3600_000,destination:body.destination === "onedrive-sync" ? "sync-backup" : "local-backup",snapshot:JSON.stringify({file:id,createdAt:backup.createdAt})});
+      db.saveSchedule({id,name:body.destination === "onedrive-sync" ? "OneDrive combined backup" : "Local combined backup",enabled:true,intervalHours:Number(body.intervalHours),nextAt:Date.now()+Number(body.intervalHours)*3600_000,destination:body.destination === "onedrive-sync" ? "sync-backup" : "local-backup",snapshot:JSON.stringify({file:id,createdAt:backup.createdAt})});
       return json({id,capturedAt:backup.createdAt},201);
     }
     if (path === "integrations/connect") return json(await connectOneDrive());
@@ -66,7 +66,7 @@ export async function v4Route(request: Request, segments: string[]): Promise<Res
         if (body.confirmed !== true || !["onedrive-sync","onedrive","sheets"].includes(String(body.destination)) || typeof body.target !== "string") throw new V4Error(400, "CONFIRM_REQUIRED", "Choose and confirm the cloud destination.");
         try {
           const result = await deliverExport(input, body.destination as "onedrive-sync" | "onedrive" | "sheets", body.target);
-          const entry = db.record({ filename: input.filename + "." + input.format, format: input.format, count: report.summary.count, totalCents: report.summary.totalCents, destination: String(body.destination), status: body.destination === "onedrive-sync" ? "queued-for-sync" : "delivered" });
+          const entry = db.record({ filename: result.filename, format: input.format, count: report.summary.count, totalCents: report.summary.totalCents, destination: String(body.destination), status: body.destination === "onedrive-sync" ? "queued-for-sync" : "delivered" });
           return json({ ...result, historyId: entry.id });
         } catch (error) {
           db.record({ filename: input.filename, format: input.format, count: report.summary.count, totalCents: report.summary.totalCents, destination: String(body.destination), status: "failed", error: error instanceof V4Error ? error.message : "Connection failed; delivery unconfirmed." });

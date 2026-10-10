@@ -32,5 +32,5 @@ export async function saveToSyncFolder(bytes: Uint8Array, filename: string, kind
   const expected = createHash("sha256").update(bytes).digest("hex");
   const actual = createHash("sha256").update(await readFile(/*turbopackIgnore: true*/ path)).digest("hex");
   if (expected !== actual) throw new V4Error(500,"SYNC_WRITE_FAILED","Saved file verification failed; inspect the sync folder before retrying.");
-  return { provider: "onedrive-sync", id: unique, path, status: "queued-for-sync", cloudConfirmed: false, sha256: actual };
+  return { provider: "onedrive-sync", id: unique, filename: unique, path, status: "queued-for-sync", cloudConfirmed: false, sha256: actual };
 }

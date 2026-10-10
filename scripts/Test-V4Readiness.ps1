@@ -11,4 +11,3 @@ if (-not $auth.loggedIn) { throw 'Claude sign-in required: run claude auth login
 $settings = Get-V3Settings
 Assert-V3ModelFiles $settings.model
 [PSCustomObject]@{ WindowsX64=$true; Node=(& $node --version); Claude=$claude; ClaudeLoggedIn=[bool]$auth.loggedIn; Git=(& git --version); GitBash=(Test-Path 'C:\Program Files\Git\bin\bash.exe'); LocalModel=$settings.model; ModelFilesVerified=$true }
-

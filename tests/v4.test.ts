@@ -21,7 +21,8 @@ const request:ExportRequest={expenses:[
  scope:"all",filters:{...EMPTY_FILTERS},generatedAt:"2026-10-10T12:00:00.000Z",format:"json",filename:"October expenses",template:"Detailed expenses"};
 test("V4 selected snapshot and formats preserve exact totals, text and accounting metadata",async()=>{
  const input={...request,scope:"filtered",filters:{...EMPTY_FILTERS,category:"Food"},expenses:request.expenses.map(r=>({...r,merchant:"Store",receiptId:"receipt-a"}))};
- const {request:valid,report}=validateExport(input);
+ const {request:valid,report}=validateExport({...input,unrequestedPrivateContent:"must not persist"});
+ assert.equal("unrequestedPrivateContent" in valid,false);
  assert.equal(report.summary.totalCents,1250);assert.equal(report.summary.count,1);
  const file=await generateExport(valid,report),json=JSON.parse(new TextDecoder().decode(file.bytes));
  assert.equal(json.expenses[0].description,"Café — lunch");assert.equal(json.expenses[0].receiptId,"receipt-a");
@@ -56,7 +57,10 @@ test("Operational metadata survives reopen; local shares expire and revoke",()=>
  const folder=mkdtempSync(join(tmpdir(),"v4-store-")),path=join(folder,"operations.sqlite");
  let db=openOperations(path);db.record({filename:"a.csv",format:"csv",count:2,totalCents:1795,destination:"browser",status:"prepared"});
  const share=db.share(JSON.stringify(request),24),expired=db.share("expired",-1);assert.equal(db.shared(expired.id),null);db.close();
- db=openOperations(path);assert.equal(db.history()[0].totalCents,1795);assert.ok(db.shared(share.id));db.revokeShare(share.id);assert.equal(db.shared(share.id),null);db.close();rmSync(folder,{recursive:true});
+ db=openOperations(path);assert.equal(db.history()[0].totalCents,1795);assert.ok(db.shared(share.id));db.revokeShare(share.id);assert.equal(db.shared(share.id),null);
+ const schedule={id:"schedule",name:"Captured",enabled:true,intervalHours:168,nextAt:1,destination:"onedrive-sync",snapshot:JSON.stringify(request)};
+ db.saveSchedule(schedule);db.removeSchedule(schedule.id);assert.equal(db.finishSchedule({...schedule,nextAt:2}),false);assert.equal(db.schedules().length,0);
+ db.close();rmSync(folder,{recursive:true});
 });
 test("Jobs deduplicate requests, cancel queued tasks and fail interrupted runs after restart",()=>{
  const folder=mkdtempSync(join(tmpdir(),"v4-jobs-")),path=join(folder,"jobs.sqlite");let db=openJobs(path);

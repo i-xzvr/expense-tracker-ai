@@ -103,4 +103,3 @@ Use screenshots to compare desktop/mobile hierarchy, empty/error/loading states 
 Begin with existing API contracts and a custom-filename export improvement. That gives us a small concrete change tied to the course while preserving the functioning V3 foundation. Follow with export scope/PDF decisions and focused browser verification. Keep cloud integration and coding-agent execution as explicit subsequent choices.
 
 Baseline quality evidence: lint and typecheck passed, 119 tests passed, 3 opt-in live-model tests skipped, build passed, audit reported zero vulnerabilities. App and Ollama were stopped during this review; live acceptance remains to be run when implementation starts.
-

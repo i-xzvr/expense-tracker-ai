@@ -79,7 +79,7 @@ export async function deliverExport(input: ExportRequest, destination: "onedrive
     if (!response.ok) throw new V4Error(response.status === 401 ? 401 : 502, "DELIVERY_FAILED", "OneDrive rejected the upload. Check authorization/folder; no delivery was confirmed.");
     const item = await response.json();
     if (typeof item.id !== "string") throw new V4Error(502, "INVALID_PROVIDER_RESPONSE", "OneDrive did not return an uploaded file ID.");
-    return { provider: destination, id: item.id as string };
+    return { provider: destination, id: item.id as string, filename };
   }
   if (!/^[a-zA-Z0-9_-]{10,200}$/.test(target)) throw new V4Error(400, "INVALID_TARGET", "Enter the Google spreadsheet ID.");
   let token = tokenOverride ?? process.env.V4_GOOGLE_ACCESS_TOKEN;
@@ -98,5 +98,5 @@ export async function deliverExport(input: ExportRequest, destination: "onedrive
   if (!response.ok) throw new V4Error(502, "PARTIAL_DELIVERY", "An empty export sheet was created, but writing rows failed. Review it before retrying.");
   const value = await response.json();
   if (value.updatedRows !== report.expenses.length + 1) throw new V4Error(502, "PARTIAL_DELIVERY", "Google did not confirm every exported row. Review the new sheet.");
-  return { provider: destination, id: target + "/" + sheetTitle };
+  return { provider: destination, id: target + "/" + sheetTitle, filename:file.filename };
 }

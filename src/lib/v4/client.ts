@@ -9,4 +9,3 @@ export function downloadBlob(blob: Blob, filename: string) {
   a.href = url; a.download = filename; document.body.appendChild(a);
   try { a.click(); } finally { a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60_000); }
 }
-

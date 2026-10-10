@@ -179,4 +179,3 @@ The course starter names Next.js 14/localStorage; our current app has already mo
 ## Next handoff
 
 Use [course-update-plan.md](course-update-plan.md) for implementation order and acceptance criteria. This phase added review documents only; app behavior, financial records, chats and course submissions were not modified. The default roadmap prioritizes the expense tracker, with a separate optional coding-agent server track.
-

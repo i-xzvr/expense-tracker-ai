@@ -14,4 +14,3 @@
 - Provider calls need explicit selected destination/confirmation. Credentials stay server-side; logs omit raw tokens/provider bodies.
 - No public deployment, automatic merging, messages, purchases or external account changes from laptop access alone.
 - Record actual implementation/verification status in docs/v4-progress.md. Course submissions are not part of app maintenance.
-

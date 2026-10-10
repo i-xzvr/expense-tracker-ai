@@ -16,4 +16,3 @@ export function apiError(error: unknown): Response {
   return Response.json({ error: known ? error.message : "This operation could not complete. Existing records are retained.", code: known ? error.code : "OPERATION_FAILED" }, { status: known ? error.status : 500, headers: privateHeaders });
 }
 export function json(value: unknown, status = 200) { return Response.json(value, { status, headers: privateHeaders }); }
-

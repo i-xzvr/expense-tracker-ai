@@ -35,17 +35,17 @@ Backup directory: C:\AI-Audit\backups\expense-v4-20261010 contains the executabl
 
 ## Verification
 
-- Required check gate: lint/types passed; 129 tests passed and 3 opt-in live tests skipped; production build passed; 12 trace manifests exclude private runtime files; dependency audit: zero vulnerabilities.
+- Required check gate: lint/types passed; 130 tests passed and 3 opt-in live tests skipped; production build passed; 12 trace manifests exclude private runtime files; dependency audit: zero vulnerabilities.
 - Opt-in real Ollama checks: all 3 passed, including financial filters/comparisons, receipt paid-total extraction, selected-chat follow-up and finance boundaries.
 - Live app selected-report explanation returned exactly the synthetic $12.50 evidence and record ID.
 - Synthetic JSON report and empty combined backup saved to the installed OneDrive folder and read back successfully. Cloud arrival is unverified; status remains queued-for-sync.
 - Downloaded direct PDF independently parsed with pypdf: Café text and $12.50 amount preserved. Multipage/font behavior also covered by deterministic tests.
 - Browser acceptance: all 6 passed using isolated synthetic IndexedDB/SQLite and a test sync root. Includes actual downloads, invalid restore protection, successful combined restore/chat merge, OneDrive history, no-AI/share revocation and mobile/origin checks. Windows completed-download files need a bounded read/copy retry while temporary handles clear; no security policy was changed.
-- Real coding-job acceptance: verification in progress; record actual result before handoff.
+- Separate scheduling-service integration passed: unauthenticated requests rejected; due local backup and OneDrive report executed; damaged schedule did not crash the worker.
+- Real Claude review job passed through the HTTP proxy; duplicate/conflicting requests, queued cancellation, events/replay and result retrieval verified. Edit/running-cancellation acceptance follows this checkpoint.
 
 ## Remaining boundaries
 
 Schedules repeat a captured snapshot and do not see future browser edits. Refresh the capture after changes. No live cross-device ledger sync, automatic retry of uncertain cloud deliveries, public agent access, automatic merge or deployment. OneDrive cloud completion is owned by the desktop sync app; Graph/Sheets account connections were not configured. Generated backup/export files are retained without automatic pruning. The combined restore is two explicit store operations, not an atomic transaction across browser IndexedDB and server SQLite. Credentials and worktrees do not transfer in backups.
 
 Windows native Claude worktrees/file restrictions are not an OS sandbox. Jobs receive a minimal runtime environment without the application's provider secrets. Job success is not proof that proposed edits pass checks. Course assessment fields/submissions were not changed.
-

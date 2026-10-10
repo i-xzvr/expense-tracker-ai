@@ -78,4 +78,3 @@ The separate service listens on 127.0.0.1:3105 and requires an unguessable local
 States: queued -> running -> succeeded/failed/cancelled. At most 10 pending jobs, one execution worker, 16 KiB input, 6,000-char task, 2 MiB process output cap, 100,000-char stored result, 120-second execution timeout, $1 API budget flag. CLI budget estimates/limits follow the account/provider; subscription usage is not an invoice guarantee.
 
 Each job uses a new worktree from committed HEAD, not uncommitted changes. Review tools are Read/Glob/Grep; edit adds Edit/Write. Claude restricted mode confines file tools; shell/web/MCP and slash commands are unavailable. Worktrees are retained for inspection; success does not imply tests passed or active files were changed. Restart marks interrupted runs failed. Job result APIs poll, while the CLI adapter consumes NDJSON internally. The current release does not claim SSE streaming or automatic merge/deploy.
-

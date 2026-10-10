@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import { readFileSync,mkdirSync,writeFileSync,copyFileSync } from "node:fs";
 import { join,resolve } from "node:path";
 import { timingSafeEqual } from "node:crypto";
+import { StringDecoder } from "node:string_decoder";
 import { openJobs,type CodingJob } from "../../src/lib/v4/jobs";
 import { operations } from "../../src/lib/v4/database";
 import { deliverExport } from "../../src/lib/v4/cloud";
@@ -36,10 +37,10 @@ async function execute(job:CodingJob){
   childEnvironment.CLAUDE_CODE_GIT_BASH_PATH=process.env.CLAUDE_CODE_GIT_BASH_PATH??"C:\\Program Files\\Git\\bin\\bash.exe";
   childEnvironment.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1";
   const child=spawn(binary,args,{cwd:workspace,windowsHide:true,stdio:["ignore","pipe","pipe"],env:childEnvironment});
-  current={job,child};let output="",pending="",failure="",totalBytes=0;
+  current={job,child};let output="",pending="",failure="",totalBytes=0;const decoder=new StringDecoder("utf8");
   const deadline=setTimeout(()=>child.kill(),120_000);let cancelled=false;
   const cancellation=setInterval(()=>{if(store.get(job.id)?.cancelRequested){cancelled=true;child.kill();}},500);
-  child.stdout.on("data",(data:Buffer)=>{totalBytes+=data.length;if(totalBytes>2_000_000){failure="Agent output exceeded its limit.";child.kill();return;}pending+=data.toString("utf8");const lines=pending.split("\n");pending=lines.pop()??"";for(const line of lines){try{const event=JSON.parse(line);if(event.type==="result"){output=String(event.result??"");if(event.is_error)failure="Claude reported execution failure."; }else if(event.type==="assistant"){store.event(job.id,"Agent response received.");}}catch{/* Partial/unrecognized frames do not count as success. */}}});
+  child.stdout.on("data",(data:Buffer)=>{totalBytes+=data.length;if(totalBytes>2_000_000){failure="Agent output exceeded its limit.";child.kill();return;}pending+=decoder.write(data);const lines=pending.split("\n");pending=lines.pop()??"";for(const line of lines){try{const event=JSON.parse(line);if(event.type==="result"){output=String(event.result??"");if(event.is_error)failure="Claude reported execution failure."; }else if(event.type==="assistant"){store.event(job.id,"Agent response received.");for(const block of event.message?.content??[]){if(block.type==="tool_use"&&["Read","Glob","Grep","Edit","Write"].includes(block.name))store.event(job.id,"File tool requested: "+block.name);}}}catch{/* Partial/unrecognized frames do not count as success. */}}});
   child.stderr.on("data",()=>{store.event(job.id,"Agent runtime diagnostic received (raw diagnostics omitted).");});
   const code=await new Promise<number|null>((accept,reject)=>{child.once("error",reject);child.once("close",accept);}).finally(()=>{clearTimeout(deadline);clearInterval(cancellation);current=null;});
   const tracked=await run("git",["diff","--no-ext-diff","--stat"],{cwd:workspace,windowsHide:true,maxBuffer:256_000});
@@ -79,11 +80,11 @@ async function scheduledExports(){
         schedule.lastStatus="Local backup copied "+new Date().toISOString();
         }
       }else{
-        const {request,report}=validateExport(JSON.parse(schedule.snapshot));const target=JSON.parse(schedule.destination);await deliverExport(request,target.provider,target.target);schedule.lastStatus=(target.provider==="onedrive-sync"?"Queued for sync ":"Delivered ")+new Date().toISOString();db.record({filename:request.filename,format:request.format,count:report.summary.count,totalCents:report.summary.totalCents,destination:target.provider,status:target.provider==="onedrive-sync"?"queued-for-sync":"delivered"});
+        const {request,report}=validateExport(JSON.parse(schedule.snapshot));const target=JSON.parse(schedule.destination);const delivered=await deliverExport(request,target.provider,target.target);schedule.lastStatus=(target.provider==="onedrive-sync"?"Queued for sync ":"Delivered ")+new Date().toISOString();db.record({filename:delivered.filename,format:request.format,count:report.summary.count,totalCents:report.summary.totalCents,destination:target.provider,status:target.provider==="onedrive-sync"?"queued-for-sync":"delivered"});
       }
     }
     catch(e){schedule.lastStatus=e instanceof V4Error?e.message:"Delivery failed or unconfirmed; inspect destination before retrying.";
-      if(!["local-backup","sync-backup"].includes(schedule.destination)){ const {request,report}=validateExport(JSON.parse(schedule.snapshot)); db.record({filename:request.filename,format:request.format,count:report.summary.count,totalCents:report.summary.totalCents,destination:JSON.parse(schedule.destination).provider,status:"failed",error:schedule.lastStatus}); }
+      if(!["local-backup","sync-backup"].includes(schedule.destination)){ try {const {request,report}=validateExport(JSON.parse(schedule.snapshot)); db.record({filename:request.filename,format:request.format,count:report.summary.count,totalCents:report.summary.totalCents,destination:JSON.parse(schedule.destination).provider,status:"failed",error:schedule.lastStatus});} catch {/* A damaged snapshot cannot crash the scheduling worker. */} }
     }
     db.finishSchedule(schedule);
   }}finally{schedulesBusy=false;}

@@ -17,4 +17,3 @@ export function monthlyInsights(workspace:Workspace,month:string){
   }
   return {totalCents,count:rows.length,categories,top:categories.filter(c=>c.totalCents>0).sort((a,b)=>b.totalCents-a.totalCents).slice(0,3),streak};
 }
-

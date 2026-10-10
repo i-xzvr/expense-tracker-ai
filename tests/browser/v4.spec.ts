@@ -102,4 +102,3 @@ test("Combined restore merges chats and restores validated financial records",as
   await expect(page.getByText(/Financial workspace restored/)).toBeVisible();
   await page.getByRole("button",{name:"Overview",exact:true}).click();await expect(page.getByRole("cell",{name:"Restored synthetic lunch",exact:true})).toBeVisible();
 });
-

@@ -12,4 +12,3 @@ export function parsePortableBackup(raw:string):PortableBackup{
   if(!isObject(v)||v.version!==4||typeof v.createdAt!=="string"||!Number.isFinite(Date.parse(v.createdAt)))throw new Error("Choose a V4 combined backup.");
   return {version:4,createdAt:v.createdAt,workspace:parseWorkspaceBackup(JSON.stringify(v.workspace)),chats:parseChatArchive(JSON.stringify(v.chats))};
 }
-

@@ -35,4 +35,3 @@ Primary sources: [Sheets values update](https://developers.google.com/workspace/
 Email prepares a local draft for manual attachment and sending. This matches a simulated/handoff workflow; it is not an SMTP sender. Local sharing/QR uses an expiring local link, not a public share. Dropbox is unconnected; the implemented real adapters are OneDrive and Google Sheets. If a provider is unavailable, its status and errors remain visible rather than simulating successful cloud delivery.
 
 Recurring exports use captured snapshots, not future browser edits. They run while V4 services and the laptop are awake/online. They advance the next attempt before delivery to avoid a restart silently repeating an uncertain attempt. Automatic retries are deliberately absent until provider-level idempotency and reconciliation are implemented.
-
