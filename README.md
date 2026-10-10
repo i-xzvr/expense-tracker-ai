@@ -16,6 +16,8 @@ Use **Start-V4.cmd** thereafter and **Stop-V4.cmd** before updates. Supported in
 
 **[Complete installation and transfer guide](docs/v4-installation.md)** · [Prerequisites, modules and connections](docs/v4-dependencies.md) · [API contracts and examples](docs/v4-api.md) · [Cloud authorization](docs/v4-cloud.md) · [Release verification](docs/v4-release-verification.md)
 
+For a retained version rather than moving main, use the [V4 0.4.0 release](https://github.com/i-xzvr/expense-tracker-ai/releases/tag/v0.4.0) and its source ZIP/checksum. The automated [Windows verification workflow](https://github.com/i-xzvr/expense-tracker-ai/actions/workflows/verify.yml) runs app and browser checks without account credentials. Upstream license notices and source provenance are in [NOTICE.md](NOTICE.md).
+
 ## V4 additions
 
 V4 retains the same browser origin, IndexedDB financial workspace, SQLite chats and optional local AI. Use **Start-V4.cmd** / **Stop-V4.cmd** for the complete app, Ollama and coding/scheduling service. Existing V3 launchers start only the app/model. Setup-V4.cmd uses the pinned runtime installer, installs project-local Git and optional Claude, checks your login, and starts V4. It does not register or purchase accounts.

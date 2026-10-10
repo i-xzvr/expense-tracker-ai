@@ -80,6 +80,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Claude-V4.ps1 
 
 Test one expense, filtered PDF/CSV/JSON download, history, and combined backup using synthetic records before entering real data. The installer smoke creates a clearly named synthetic export-history row; it does not add expenses to your browser ledger, send data to cloud providers, or execute a paid Claude job. Use a scoped **review** job to verify live coding access yourself; generated work remains in a separate worktree. Login verification does not prove available account quota or cloud delivery.
 
+Optional live Claude acceptance (uses normal account usage and retains a review worktree/job):
+
+```powershell
+.\.runtime\node-v24.19.0-win-x64\node.exe .\scripts\verify-agent.mjs
+```
+
+This requires a real Read tool result from the isolated source worktree; it never edits the active project or accesses financial records.
+
 ## 5. Optional connections
 
 - **OneDrive desktop folder:** sign in to the Microsoft OneDrive app on the new machine first. V4 detects `OneDriveConsumer`/`OneDrive`, or use the wizard's absolute folder override. Select and confirm a synthetic export. Verify the file under `Expense Tracker V4/Reports` and the desktop client's sync status. V4's `queued-for-sync` proves local bytes, not cloud arrival.
