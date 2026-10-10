@@ -1,4 +1,5 @@
 import { ChatDatabaseError, getChatDatabase, type openChatDatabase } from "./chat-database";
+import { createHash } from "node:crypto";
 import { CHAT_MAX_BYTES } from "./chat-store";
 import { guardLocalRequest } from "./ai/server";
 import { AIError, isObject, readBoundedJson } from "./ai/validation";
@@ -32,6 +33,10 @@ export function createChatHandlers(database: () => ReturnType<typeof openChatDat
       return Response.json({ saved: true }, { headers });
     }, CHAT_MAX_BYTES * 2 + 1024 * 1024),
     POST: (request: Request) => handle(request, body => {
+      if (isObject(body) && body.action === "import" && body.confirmed === true && typeof body.raw === "string") {
+        database().migrate("backup-" + createHash("sha256").update(body.raw).digest("hex"), body.raw);
+        return Response.json({ imported: true }, { headers });
+      }
       if (!isObject(body) || body.action !== "migrate" || !validId(body.sourceId) || typeof body.raw !== "string") throw new ChatDatabaseError(400, "The browser-history migration is invalid.");
       database().migrate(body.sourceId, body.raw);
       return Response.json({ migrated: true }, { headers });

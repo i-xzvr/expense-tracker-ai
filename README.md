@@ -1,6 +1,27 @@
-# Expense Tracker V3
+# Expense Tracker V4
 
-Local Windows expense bookkeeping with private AI assistance. Open the app through **Start-V3.cmd** after running **Setup-V3.cmd** once.
+Local Windows expense bookkeeping with private AI assistance. Open the app through **Start-V4.cmd** after running **Setup-V4.cmd** once.
+
+## V4 additions
+
+V4 retains the same browser origin, IndexedDB financial workspace, SQLite chats and optional local AI. Use **Start-V4.cmd** / **Stop-V4.cmd** for the complete app, Ollama and coding/scheduling service. Existing V3 launchers start only the app/model, so use the V4 launcher for jobs and schedules. Setup-V4.cmd reuses the pinned V3 installer and checks your existing Claude installation/login; it does not register a new Claude account.
+
+- Export Data: CSV, JSON and direct PDF; custom filenames; independent date/category/search selection; four report templates; deterministic preview and optional local AI explanation.
+- Integrations: export history, captured-snapshot schedules, installed OneDrive folder delivery, optional Microsoft Graph and Google Sheets adapters.
+- Backup: combined financial/receipt/chat JSON, validated financial restore and transactional chat merge; weekly local or OneDrive captured backups. Financial-only V3 backups remain supported.
+- Coding agent: persistent Claude jobs in separate Git worktrees, scoped review/edit tools, event replay, cancellation and reviewed result artifacts. The active project is never automatically changed.
+- Insights: accessible category chart/top three; budget streak only when a month is closed and every category has a budget.
+- Email draft handoff and expiring local share links/QR. Dropbox is unconnected. Local links do not provide remote access.
+
+The installed OneDrive adapter writes under **OneDrive/Expense Tracker V4/Reports** or **Backups** and verifies the local bytes. Files receive unique names. “Queued for sync” does not claim arrival in Microsoft's cloud. All cloud actions require an explicit selected destination; combined backups include private receipts and chats. Provider credentials and worktrees are excluded from backups.
+
+Schedules repeat a **captured snapshot**, not subsequent browser edits, and run only while the laptop and V4 services are awake. Capture a new snapshot after changes. V4 does not provide live cross-device ledger synchronization. No automatic pruning is enabled: manage old exports/backups in File Explorer after retaining what you need.
+
+[Architecture decision](docs/adr-001-v4.md) · [API contracts](docs/v4-api.md) · [Cloud/OneDrive setup](docs/v4-cloud.md) · [Course coverage and verification](docs/v4-progress.md).
+
+For development: **npm run check** includes lint, types, tests, production build, private-file tracing verification and dependency audit. **npm run test:browser** runs Chromium with synthetic isolated data on port 3114; install its pinned browser with `npx playwright install chromium`. Opt-in local-model checks are described below. The coding service listens only on 127.0.0.1:3105; the browser proxy keeps its bearer token server-side. Claude jobs use your account's normal usage limits; Windows file restrictions are not an OS sandbox.
+
+## Retained V3 financial and AI workflows
 
 ## Install and transfer
 
@@ -29,7 +50,7 @@ Conversations now live in **`data/chats.sqlite` inside the V3 project folder**, 
 
 Use **Tools** to search/filter/open/rename chats and inspect their full IDs. General chats show `GEN-…`; financial chats show `FIN-…`. Right-click the title, press Shift+F10, or click its ••• Actions button to open the menu. **Delete chat** asks **No, keep chat** or **Yes, delete permanently**, naming the exact title, type and UUID. Yes removes that chat's messages, draft and evidence snapshots from SQLite; other chats and expense records are untouched. Generating/unsaved replies cannot be deleted locally, and a chat changed after the warning requires review and a fresh confirmation. Deletion has no Trash/Undo and does not erase external backups, exported files or OS snapshots.
 
-**Financial workspace backups do not include chat history.** Export chat history from Tools or the popup as a readable JSON archive. To move the working database to another Windows machine, run **Stop-V3.cmd** first, then copy the V3 `data` folder along with the project (or into the newly set-up project) before starting it. Do not copy/replace a running SQLite file. The source ZIP excludes personal databases and runtime data. JSON chat archive import is still not implemented; copying the stopped SQLite database is the supported restore/transfer method. History is not encrypted by this app; protect the data folder and backups with your device's normal access controls.
+**Financial workspace backups do not include chat history.** Export chat history from Tools or the popup as a readable JSON archive. To move the working database to another Windows machine, run **Stop-V3.cmd** first, then copy the V3 `data` folder along with the project (or into the newly set-up project) before starting it. Do not copy/replace a running SQLite file. The source ZIP excludes personal databases and runtime data. V4 combined backups support validated chat archive merge; stopped-database copying remains an alternative for full database transfer. History is not encrypted by this app; protect the data folder and backups with your device's normal access controls.
 
 Reopening a conversation supplies its recent completed turns, not every past chat, to the local model (up to 31 messages / 16,000 content characters). Search finds saved chats locally; it does not give the model automatic memory of other chats. Limits are 50 conversations, 200 messages per conversation, and 24 MiB total history. Long chats keep their full saved transcript within these limits, while older turns fall outside model context. Interrupted replies are marked and excluded from context; stopped questions can be sent again. Financial follow-ups supply recent question text and the previous interpreted filters, never historical totals or ledger rows, to the query planner. Each new financial answer is calculated from current records for the selected report month. Historical evidence remains a dated snapshot.
 

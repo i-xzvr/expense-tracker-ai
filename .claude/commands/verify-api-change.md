@@ -1,0 +1,2 @@
+For $ARGUMENTS, identify the affected contract in docs/v4-api.md and inspect its implementation/tests. Run relevant synthetic tests, then npm run check. Add focused browser or live checks only when needed. Verify bounded inputs, Host/Origin checks, cancellation, conflicts and readiness. Record executed/skipped checks and actual failures; never copy credentials into logs.
+

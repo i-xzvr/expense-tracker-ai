@@ -1,363 +1,70 @@
 "use client";
-
 import { useId, useMemo, useState } from "react";
-import { Expense, ExpenseFilters } from "@/types/expense";
-import { filterExpenses } from "@/lib/expenses";
-import { formatCurrency, formatDate } from "@/lib/format";
-import {
-  buildExpenseReport,
-  ExportFormat,
-  ExportScope,
-} from "@/lib/export/report";
-import { buildExportFile } from "@/lib/export/serializers";
-import { downloadExportFile } from "@/lib/export/download";
-import Modal from "@/components/Modal";
-
-interface ExportDialogProps {
-  expenses: Expense[];
-  filters: ExpenseFilters;
-  onClose: () => void;
-}
-
-export default function ExportDialog({
-  expenses,
-  filters,
-  onClose,
-}: ExportDialogProps) {
-  const id = useId();
-  const hasFilters = !!(
-    filters.search.trim() ||
-    filters.category !== "All" ||
-    filters.startDate ||
-    filters.endDate
-  );
-  const [scope, setScope] = useState<ExportScope>(
-    hasFilters ? "filtered" : "all",
-  );
-  const [format, setFormat] = useState<ExportFormat>("csv");
-  const [generatedAt] = useState(() => new Date());
-  const [feedback, setFeedback] = useState<{
-    kind: "status" | "alert";
-    text: string;
-  } | null>(null);
-  const filteredCount = useMemo(
-    () => filterExpenses(expenses, filters).length,
-    [expenses, filters],
-  );
-  const result = useMemo(() => {
-    try {
-      return {
-        report: buildExpenseReport(expenses, {
-          scope,
-          filters,
-          now: generatedAt,
-        }),
-        error: null,
-      };
-    } catch (error) {
-      return {
-        report: null,
-        error:
-          error instanceof Error
-            ? error.message
-            : "These expenses could not be prepared for export.",
-      };
-    }
-  }, [expenses, filters, scope, generatedAt]);
-  const report = result.report;
-  const filterDescription = [
-    filters.category !== "All" ? filters.category : null,
-    filters.startDate ? `From ${formatDate(filters.startDate)}` : null,
-    filters.endDate ? `Through ${formatDate(filters.endDate)}` : null,
-    filters.search.trim() ? `Search: “${filters.search.trim()}”` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  function download() {
-    if (!report || report.summary.count === 0) return;
-    try {
-      const file = buildExportFile(report, format);
-      downloadExportFile(file);
-      setFeedback({
-        kind: "status",
-        text: `Download started: ${file.filename}. Check your browser’s downloads.`,
-      });
-    } catch (error) {
-      setFeedback({
-        kind: "alert",
-        text:
-          error instanceof Error
-            ? error.message
-            : "The download could not start. Please try again.",
-      });
-    }
+import { CATEGORIES, EMPTY_FILTERS, type Expense, type ExpenseFilters } from "@/types/expense";
+import { buildExpenseReport, type ExportScope } from "@/lib/export/report";
+import { formatCurrency } from "@/lib/format";
+import type { ExportRequest, ReportTemplate, V4Format } from "@/lib/v4/export";
+import { api, downloadBlob } from "@/lib/v4/client";
+import Modal from "./Modal";
+const templates: ReportTemplate[] = ["Detailed expenses","Monthly Summary","Category Analysis","Tax Report"];
+export default function ExportDialog({ expenses, filters, onClose }: { expenses: Expense[]; filters: ExpenseFilters; onClose: () => void }) {
+  const id=useId(), [scope,setScope]=useState<ExportScope>("all"), [selection,setSelection]=useState({...filters});
+  const [format,setFormat]=useState<V4Format>("csv"), [template,setTemplate]=useState<ReportTemplate>("Detailed expenses");
+  const [filename,setFilename]=useState("expenses-"+new Date().toISOString().slice(0,10));
+  const [generatedAt]=useState(()=>new Date().toISOString()), [busy,setBusy]=useState(false);
+  const [feedback,setFeedback]=useState<{error?:boolean;text:string}|null>(null);
+  const [destination,setDestination]=useState<"onedrive-sync"|"onedrive"|"sheets">("onedrive-sync"),[target,setTarget]=useState("Expense Exports");
+  const [confirmed,setConfirmed]=useState(false),[interval,setInterval]=useState(168);
+  const [shared,setShared]=useState<{url:string;qr:string;id:string}|null>(null);
+  const result=useMemo(()=>{try{return {report:buildExpenseReport(expenses,{scope,filters:selection,now:new Date(generatedAt)}),error:null};}catch(e){return {report:null,error:e instanceof Error?e.message:"Invalid selection."};}},[expenses,scope,selection,generatedAt]);
+  const report=result.report;
+  const request:ExportRequest={expenses,scope,filters:selection,generatedAt,format,filename,template};
+  function change(key:keyof ExpenseFilters,value:string){setSelection(p=>({...p,[key]:value}));setScope("filtered");setConfirmed(false);setShared(null);}
+  async function action(fn:()=>Promise<string>){if(busy||!report?.summary.count)return;setBusy(true);setFeedback(null);try{setFeedback({text:await fn()});}catch(e){setFeedback({error:true,text:e instanceof Error?e.message:"Operation failed."});}finally{setBusy(false);}}
+  async function download(){
+    const response=await fetch("/api/v4/export",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(request),signal:AbortSignal.timeout(120_000)});
+    if(!response.ok)throw new Error((await response.json()).error||"Export failed.");
+    const actual=decodeURIComponent((response.headers.get("content-disposition")??"").split("UTF-8''")[1]??filename+"."+format);
+    downloadBlob(await response.blob(),actual);
+    return "Download started: "+actual+". "+decodeURIComponent(response.headers.get("x-export-warnings")??"");
   }
-
-  return (
-    <Modal title="Export expenses" onClose={onClose} size="wide">
-      <p className="mb-6 text-sm text-slate-600">
-        Choose what to include, check the preview, and take your data with you.
-      </p>
-
-      <div className="grid gap-6 sm:grid-cols-2">
-        <fieldset>
-          <legend className="mb-2 text-sm font-semibold text-slate-900">
-            1. Choose expenses
-          </legend>
-          <div className="space-y-2">
-            {(
-              [
-                {
-                  value: "all",
-                  title: "All expenses",
-                  description: `${expenses.length} saved expense${expenses.length === 1 ? "" : "s"}`,
-                },
-                {
-                  value: "filtered",
-                  title: "Current results",
-                  description: `${filteredCount} matching expense${filteredCount === 1 ? "" : "s"}`,
-                },
-              ] as const
-            ).map((option) => (
-              <label
-                key={option.value}
-                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${scope === option.value ? "border-indigo-500 bg-indigo-50/60" : "border-slate-200 hover:bg-slate-50"}`}
-              >
-                <input
-                  type="radio"
-                  name={`${id}-scope`}
-                  value={option.value}
-                  checked={scope === option.value}
-                  onChange={() => {
-                    setScope(option.value);
-                    setFeedback(null);
-                  }}
-                  className="mt-1 h-4 w-4 accent-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                />
-                <span>
-                  <span className="block text-sm font-medium text-slate-900">
-                    {option.title}
-                  </span>
-                  <span className="block text-xs text-slate-600">
-                    {option.description}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend className="mb-2 text-sm font-semibold text-slate-900">
-            2. Choose a format
-          </legend>
-          <div className="space-y-2">
-            {(
-              [
-                {
-                  value: "csv",
-                  title: "CSV",
-                  description: "For Excel, Sheets, and other spreadsheets",
-                },
-                {
-                  value: "json",
-                  title: "JSON",
-                  description: "Full records and export details",
-                },
-              ] as const
-            ).map((option) => (
-              <label
-                key={option.value}
-                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${format === option.value ? "border-indigo-500 bg-indigo-50/60" : "border-slate-200 hover:bg-slate-50"}`}
-              >
-                <input
-                  type="radio"
-                  name={`${id}-format`}
-                  value={option.value}
-                  checked={format === option.value}
-                  onChange={() => {
-                    setFormat(option.value);
-                    setFeedback(null);
-                  }}
-                  className="mt-1 h-4 w-4 accent-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                />
-                <span>
-                  <span className="block text-sm font-medium text-slate-900">
-                    {option.title}
-                  </span>
-                  <span className="block text-xs text-slate-600">
-                    {option.description}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      </div>
-
-      <p className="mt-3 break-words text-xs leading-relaxed text-slate-500">
-        {scope === "all"
-          ? "Includes every saved expense, regardless of dashboard filters."
-          : filterDescription ||
-            "No dashboard filters applied. Current results include all expenses."}
-      </p>
-
-      {result.error ? (
-        <p
-          role="alert"
-          className="mt-5 rounded-lg bg-rose-50 p-4 text-sm text-rose-700"
-        >
-          {result.error}
-        </p>
-      ) : (
-        report && (
-          <section className="mt-5" aria-labelledby={`${id}-preview`}>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3
-                id={`${id}-preview`}
-                className="text-sm font-semibold text-slate-900"
-              >
-                3. Check your export
-              </h3>
-              <span className="text-xs text-slate-500">
-                Newest expenses first
-              </span>
-            </div>
-            <div className="grid grid-cols-1 gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
-              <div>
-                <p className="text-xs text-slate-500">Expenses included</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums">
-                  {report.summary.count}
-                </p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-slate-500">Total (USD)</p>
-                <p className="mt-1 break-words text-xl font-semibold tabular-nums">
-                  {formatCurrency(report.summary.totalCents / 100)}
-                </p>
-              </div>
-              {report.summary.startDate && report.summary.endDate && (
-                <p className="text-xs text-slate-500 sm:col-span-2">
-                  {formatDate(report.summary.startDate)} –{" "}
-                  {formatDate(report.summary.endDate)}
-                </p>
-              )}
-            </div>
-
-            {report.summary.count === 0 ? (
-              <div className="mt-3 rounded-xl border border-dashed border-slate-300 p-6 text-center">
-                <p className="text-sm font-medium text-slate-800">
-                  No expenses to export
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {expenses.length === 0
-                    ? "Add an expense to get started."
-                    : "Choose All expenses, or close this dialog and adjust your dashboard filters."}
-                </p>
-              </div>
-            ) : (
-              <>
-                <div
-                  className="mt-3 overflow-x-auto rounded-xl border border-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500"
-                  tabIndex={0}
-                  role="region"
-                  aria-label="Expense preview, scroll horizontally if needed"
-                >
-                  <table className="w-full min-w-[500px] text-left text-sm">
-                    <caption className="sr-only">
-                      Preview of the first {Math.min(report.summary.count, 5)}{" "}
-                      expense{report.summary.count === 1 ? "" : "s"}. The
-                      download includes {report.summary.count} selected expense
-                      {report.summary.count === 1 ? "" : "s"}.
-                    </caption>
-                    <thead className="bg-slate-50 text-xs text-slate-500">
-                      <tr>
-                        <th scope="col" className="px-3 py-2 font-medium">
-                          Date
-                        </th>
-                        <th scope="col" className="px-3 py-2 font-medium">
-                          Category
-                        </th>
-                        <th scope="col" className="px-3 py-2 font-medium">
-                          Description
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-3 py-2 text-right font-medium"
-                        >
-                          Amount
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {report.expenses.slice(0, 5).map((expense, index) => (
-                        <tr key={`${expense.id}-${index}`}>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-xs text-slate-600">
-                            {formatDate(expense.date)}
-                          </td>
-                          <td className="px-3 py-2.5 text-xs text-slate-600">
-                            {expense.category}
-                          </td>
-                          <td className="max-w-[240px] whitespace-pre-wrap break-words px-3 py-2.5 text-slate-800">
-                            {expense.description}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
-                            {formatCurrency(expense.amount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="mt-2 text-xs text-slate-500">
-                  {report.summary.count > 5
-                    ? `Previewing 5 of ${report.summary.count} expenses. All ${report.summary.count} will be exported.`
-                    : `All ${report.summary.count} selected expense${report.summary.count === 1 ? " is" : "s are"} shown.`}
-                </p>
-              </>
-            )}
-          </section>
-        )
-      )}
-
-      <p className="mt-4 text-xs leading-relaxed text-slate-500">
-        {format === "csv"
-          ? "CSV includes date, category, amount in USD, and description. Spreadsheet formula-like text is protected."
-          : "JSON preserves every selected record, including IDs and creation timestamps, with totals and the filters used."}
-      </p>
-      <div aria-live="polite" aria-atomic="true" className="mt-3">
-        {feedback && (
-          <p
-            role={feedback.kind}
-            className={`break-words rounded-lg p-3 text-sm ${feedback.kind === "alert" ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-800"}`}
-          >
-            {feedback.text}
-          </p>
-        )}
-      </div>
-      <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-slate-500">
-          Created on this device. Nothing is uploaded.
-        </p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-secondary flex-1 sm:flex-none"
-          >
-            Close
-          </button>
-          <button
-            type="button"
-            onClick={download}
-            disabled={!report || report.summary.count === 0}
-            className="btn-primary flex-1 sm:flex-none"
-          >
-            Download {format.toUpperCase()}
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
+  return <Modal title="Export expenses" onClose={onClose} size="wide"><div className="space-y-5" aria-busy={busy}>
+    <p className="text-sm text-slate-600">Preview one selection for CSV, JSON or direct PDF. Local AI can explain the same records.</p>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <label className="label" htmlFor={id+"-scope"}>Export selection<select aria-label="Export selection" id={id+"-scope"} className="input" value={scope} onChange={e=>{setScope(e.target.value as ExportScope);setConfirmed(false);}}><option value="all">All expenses</option><option value="filtered">Custom filters</option></select></label>
+      <label className="label" htmlFor={id+"-template"}>Report template<select aria-label="Report template" id={id+"-template"} className="input" value={template} onChange={e=>setTemplate(e.target.value as ReportTemplate)}>{templates.map(t=><option key={t}>{t}</option>)}</select></label>
+      <label className="label" htmlFor={id+"-format"}>Format<select aria-label="Format" id={id+"-format"} className="input" value={format} onChange={e=>setFormat(e.target.value as V4Format)}><option value="csv">CSV</option><option value="json">JSON</option><option value="pdf">PDF</option></select></label>
+      <label className="label" htmlFor={id+"-name"}>Filename<input aria-label="Filename" id={id+"-name"} className="input" value={filename} maxLength={104} onChange={e=>setFilename(e.target.value)}/><span className="text-xs font-normal">The extension is added automatically.</span></label>
+    </div>
+    {scope==="filtered"&&<fieldset className="rounded-xl border p-4"><legend className="font-semibold">Independent export filters</legend><div className="grid gap-3 sm:grid-cols-2">
+      <label className="label">Start date<input type="date" className="input" value={selection.startDate} onChange={e=>change("startDate",e.target.value)}/></label>
+      <label className="label">End date<input type="date" className="input" value={selection.endDate} onChange={e=>change("endDate",e.target.value)}/></label>
+      <label className="label">Category<select aria-label="Category" className="input" value={selection.category} onChange={e=>change("category",e.target.value)}><option>All</option>{CATEGORIES.map(c=><option key={c}>{c}</option>)}</select></label>
+      <label className="label">Search<input className="input" value={selection.search} onChange={e=>change("search",e.target.value)}/></label>
+    </div><div className="mt-3 flex gap-3"><button className="btn-secondary" onClick={()=>setSelection({...filters})}>Use dashboard filters</button><button className="btn-secondary" onClick={()=>setSelection({...EMPTY_FILTERS})}>Clear export filters</button></div></fieldset>}
+    {result.error&&<p role="alert" className="text-rose-700">{result.error}</p>}
+    {report&&<section aria-label="Export preview" className="rounded-xl bg-slate-50 p-4"><h3 className="font-semibold">{report.summary.count} expenses · {formatCurrency(report.summary.totalCents/100)}</h3><p className="text-xs">{report.summary.startDate??"No dates"} — {report.summary.endDate??"No dates"} · USD · newest first</p>
+      <div role="region" tabIndex={0} aria-label="Selected expense rows" className="mt-3 overflow-auto"><table className="w-full text-left text-sm"><caption className="sr-only">First five selected expenses</caption><thead><tr>{["Date","Category","Description","Amount"].map(x=><th key={x} scope="col" className="p-2">{x}</th>)}</tr></thead><tbody>{report.expenses.slice(0,5).map(r=><tr key={r.id}><td className="p-2">{r.date}</td><td className="p-2">{r.category}</td><td className="p-2">{r.description}</td><td className="p-2">{formatCurrency(r.amount)}</td></tr>)}</tbody></table></div><p className="text-xs">{report.summary.count>5?"Showing 5 rows; every selected row is exported.":"Every selected row is shown."}</p></section>}
+    <div className="flex flex-wrap gap-2">
+      <button className="btn-primary" disabled={busy||!report?.summary.count} onClick={()=>action(download)}>{busy?"Working…":"Download "+format.toUpperCase()}</button>
+      <button className="btn-secondary" disabled={busy||!report?.summary.count} onClick={()=>action(async()=>{const response=await fetch("/api/ai/query",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:"Show expense summary from "+report!.summary.startDate+" to "+report!.summary.endDate+".",month:report!.summary.startDate!.slice(0,7),expenses:report!.expenses}),signal:AbortSignal.timeout(120_000)});const value=await response.json();if(!response.ok)throw new Error(value.error||"AI unavailable.");return value.answer;})}>Explain selection with local AI</button>
+      <button className="btn-secondary" disabled={busy||!report?.summary.count} onClick={()=>action(async()=>{const value=await api<{id:string}>("shares",{export:request,confirmed:true});const url=location.origin+"/api/v4/shares/"+value.id;const qr=(await import("qrcode")).default;setShared({url,id:value.id,qr:await qr.toDataURL(url)});return "Local snapshot link created for 24 hours. It works only on this laptop.";})}>Create local share / QR</button>
+      <button className="btn-secondary" onClick={()=>{location.href="mailto:?subject="+encodeURIComponent(template)+"&body="+encodeURIComponent("Please attach your downloaded expense report. Financial data is not included in this draft.");}}>Prepare email draft</button>
+    </div>
+    {shared&&<div className="rounded-xl border p-4"><a className="break-all text-sm text-indigo-700 underline" href={shared.url}>Download local shared snapshot</a>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={shared.qr} alt="QR for the local snapshot link" width={160} height={160}/><button className="btn-secondary" onClick={()=>action(async()=>{await api("shares",{id:shared.id},"DELETE");setShared(null);return "Share revoked.";})}>Revoke link</button></div>}
+    <details className="rounded-xl border p-4"><summary className="cursor-pointer font-semibold">Cloud delivery and recurring exports</summary><div className="mt-4 space-y-3">
+      <p className="text-xs">Connect accounts in Integrations first. Schedules repeat this captured snapshot, while the laptop and V4 services run.</p>
+      <label className="label">Destination<select aria-label="Destination" className="input" value={destination} onChange={e=>{setDestination(e.target.value as typeof destination);setTarget(e.target.value==="onedrive"?"Expense Exports":"");setConfirmed(false);}}><option value="onedrive-sync">Installed OneDrive sync folder</option><option value="onedrive">OneDrive API</option><option value="sheets">Google Sheets</option></select></label>
+      {destination!=="onedrive-sync"&&<label className="label">{destination==="onedrive"?"Existing OneDrive folder":"Spreadsheet ID"}<input className="input" value={target} onChange={e=>{setTarget(e.target.value);setConfirmed(false);}}/></label>}
+      <label className="flex gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>Send this previewed selection to this destination. A saved schedule may repeat this captured snapshot.</label>
+      <div className="flex flex-wrap gap-2"><button className="btn-primary" disabled={busy||!confirmed||!report?.summary.count} onClick={()=>action(async()=>{const value=await api<{id:string}>("delivery",{export:request,destination,target,confirmed});return (destination==="onedrive-sync"?"Saved to OneDrive folder; cloud sync completion is unverified: ":"Cloud delivery confirmed: ")+value.id;})}>Send selected export</button>
+        <label className="label">Repeat<select className="input" value={interval} onChange={e=>setInterval(Number(e.target.value))}><option value={24}>Daily</option><option value={168}>Weekly</option><option value={720}>Every 30 days</option></select></label>
+        <button className="btn-secondary" disabled={busy||!confirmed||!report?.summary.count} onClick={()=>action(async()=>{await api("schedules",{export:request,destination,target,confirmed,intervalHours:interval,name:template});return "Snapshot schedule saved. Manage it in Integrations.";})}>Save export schedule</button></div>
+    </div></details>
+    {feedback&&<p role={feedback.error?"alert":"status"} className={"rounded-lg p-3 text-sm "+(feedback.error?"bg-rose-50 text-rose-800":"bg-emerald-50 text-emerald-800")}>{feedback.text}</p>}
+    <p className="text-xs text-slate-500">Downloads stay local. OneDrive sync files receive unique names. Cloud actions send the selected report without receipt images. History records preparation/provider confirmation, not whether the browser saved a file.</p>
+    <button className="btn-secondary" onClick={onClose}>Close</button>
+  </div></Modal>;
 }
