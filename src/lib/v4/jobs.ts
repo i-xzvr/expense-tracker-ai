@@ -10,7 +10,7 @@ export function openJobs(path:string){
   const db=new DatabaseSync(path,{timeout:5000});
   db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,request_key TEXT UNIQUE,payload TEXT NOT NULL) STRICT; CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT,job_id TEXT NOT NULL,payload TEXT NOT NULL) STRICT;");
   function get(id:string):CodingJob|null{const row=db.prepare("SELECT payload FROM jobs WHERE id=?").get(id);return row?JSON.parse(row.payload as string):null;}
-  function save(job:CodingJob){job.updatedAt=Date.now();db.prepare("UPDATE jobs SET payload=? WHERE id=?").run(JSON.stringify(job),job.id);}
+  function save(job:CodingJob){job.cancelRequested ||= get(job.id)?.cancelRequested ?? false;job.updatedAt=Date.now();db.prepare("UPDATE jobs SET payload=? WHERE id=?").run(JSON.stringify(job),job.id);}
   return {
     get,save,
     byRequest(key:string):CodingJob|null{const row=db.prepare("SELECT payload FROM jobs WHERE request_key=?").get(key);return row?JSON.parse(row.payload as string):null;},

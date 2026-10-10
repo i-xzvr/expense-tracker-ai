@@ -66,6 +66,8 @@ test("Jobs deduplicate requests, cancel queued tasks and fail interrupted runs a
  const folder=mkdtempSync(join(tmpdir(),"v4-jobs-")),path=join(folder,"jobs.sqlite");let db=openJobs(path);
  const j=db.create("Review export","review","request-a");assert.equal(db.create("Review export","review","request-a").id,j.id);
  assert.throws(()=>db.create("Different task","review","request-a"));assert.equal(db.claim()?.state,"running");
+ // Worktree preparation holds an older job object while HTTP cancellation updates storage.
+ const stale=db.get(j.id)!;db.cancel(j.id);db.save({...stale,workspace:"synthetic-worktree"});assert.equal(db.get(j.id)?.cancelRequested,true);
  db.event(j.id,"Started");assert.equal(db.events(j.id).length,1);assert.equal(db.events(j.id,1).length,0);
  db.close();db=openJobs(path);db.recover();assert.equal(db.get(j.id)?.state,"failed");
  const q=db.create("Queued","review","request-b");assert.equal(db.cancel(q.id)?.state,"cancelled");assert.equal(db.claim(),null);

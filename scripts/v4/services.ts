@@ -29,6 +29,7 @@ async function execute(job:CodingJob){
   mkdirSync(dirname(workspace),{recursive:true});
   await run("git",["worktree","add","-b",branch,workspace,"HEAD"],{cwd:root,windowsHide:true,timeout:30_000});
   job.workspace=workspace;store.save(job);store.event(job.id,"Isolated worktree created from committed HEAD; ignored financial data and credentials are not copied.");
+  if(job.cancelRequested){job.state="cancelled";store.save(job);store.event(job.id,"Cancelled during worktree preparation; Claude was not started.");return;}
   const tools=job.profile==="review"?"Read,Glob,Grep":"Read,Glob,Grep,Edit,Write";
   const binary=process.env.V4_CLAUDE_EXE??join(process.env.USERPROFILE??""," .local".trim(),"npm","node_modules","@anthropic-ai","claude-code","bin","claude.exe");
   const args=["-p",job.task,"--restricted","--tools",tools,"--allowedTools",tools,"--permission-prompts","none","--strict-mcp-config","--mcp-config",'{"mcpServers":{}}',"--disable-slash-commands","--no-session-persistence","--output-format","stream-json","--verbose","--model","sonnet","--max-budget-usd","1"];
